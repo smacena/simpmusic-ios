@@ -1,0 +1,408 @@
+/* Implementation shared with the Kotlin app (core/data/src/nativeInterop/cinterop/simpdsp.def). */
+#include "SimpDSP.h"
+/*
+ * SimpMusic iOS audio processing, in C.
+ *
+ * Everything that runs on the real-time audio thread lives here: the MTAudioProcessingTap
+ * callbacks, the ten-band equalizer, volume normalization, the echo (Delay), the convolution
+ * reverb and the output limiter. Kotlin only publishes settings through the simp_*_set functions.
+ * No allocation, lock or Kotlin call happens on the audio thread: settings are immutable blocks
+ * swapped in with one atomic store, and a replaced block is freed two seconds later on a
+ * background queue, when no render call can still be using it.
+ *
+ * Two tap slots exist (the current track and, during a crossfade, the incoming one); each has its
+ * own filter memory, echo lines and reverb tail, so the two tracks never smear into each other.
+ */
+#include <MediaToolbox/MediaToolbox.h>
+#include <AudioToolbox/AudioToolbox.h>
+#include <Accelerate/Accelerate.h>
+#include <dispatch/dispatch.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <stdint.h>
+
+#define SIMP_SLOTS 2
+#define SIMP_CH 2
+#define SIMP_BANDS 10
+#define SIMP_MAX_TAPS 16
+#define SIMP_RB_BLOCK 1024
+#define SIMP_RB_N 2048
+#define SIMP_RB_LOG2N 11
+#define SIMP_LIMIT_KNEE 0.8f
+
+/* ---------------------------------------------------------------- retire helper */
+
+static void simp_free_later(void* ptr, void (*fn)(void*)) {
+    if (ptr == NULL) return;
+    dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
+                     dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ptr, fn);
+}
+
+/* ---------------------------------------------------------------- equalizer */
+
+typedef struct {
+    int active;            /* any band != 0 or preamp != 0 */
+    float preamp;          /* linear */
+    double c[SIMP_BANDS][5]; /* b0 b1 b2 a1 a2, normalised by a0 */
+} SimpEq;
+
+static SimpEq* volatile g_eq = NULL;
+static double g_eq_gains[SIMP_BANDS];
+static double g_eq_preamp_db = 0;
+static int g_eq_has_bands = 0;
+static double g_rate = 44100.0;
+static double g_eq_state[SIMP_SLOTS][SIMP_CH][SIMP_BANDS][2];
+
+static SimpEq* simp_eq_build(double rate) {
+    SimpEq* eq = (SimpEq*)calloc(1, sizeof(SimpEq));
+    eq->preamp = (float)pow(10.0, g_eq_preamp_db / 20.0);
+    int any = 0;
+    for (int b = 0; b < SIMP_BANDS; b++) {
+        double gain = g_eq_has_bands ? g_eq_gains[b] : 0.0;
+        if (gain != 0.0) any = 1;
+        double f0 = 31.25 * pow(2.0, b);
+        double w0 = 2.0 * M_PI * f0 / rate;
+        if (w0 >= M_PI) { eq->c[b][0] = 1; continue; } /* above Nyquist: identity */
+        double A = pow(10.0, gain / 40.0);
+        double alpha = sin(w0) / (2.0 * 1.41);
+        double cw = cos(w0);
+        double a0 = 1.0 + alpha / A;
+        eq->c[b][0] = (1.0 + alpha * A) / a0;
+        eq->c[b][1] = (-2.0 * cw) / a0;
+        eq->c[b][2] = (1.0 - alpha * A) / a0;
+        eq->c[b][3] = (-2.0 * cw) / a0;
+        eq->c[b][4] = (1.0 - alpha / A) / a0;
+    }
+    eq->active = any || eq->preamp != 1.0f;
+    if (!any) for (int b = 0; b < SIMP_BANDS; b++) { eq->c[b][0] = 1; eq->c[b][1] = eq->c[b][2] = eq->c[b][3] = eq->c[b][4] = 0; }
+    return eq;
+}
+
+static void simp_eq_publish(void) {
+    SimpEq* fresh = simp_eq_build(g_rate);
+    SimpEq* old = __atomic_exchange_n(&g_eq, fresh, __ATOMIC_ACQ_REL);
+    simp_free_later(old, free);
+}
+
+/* gainsDb: 10 values, or count 0 for "equalizer off". */
+void simp_eq_set(const double* gainsDb, int count, double preampDb) {
+    g_eq_has_bands = count > 0;
+    for (int b = 0; b < SIMP_BANDS; b++) g_eq_gains[b] = (b < count && gainsDb) ? gainsDb[b] : 0.0;
+    g_eq_preamp_db = g_eq_has_bands ? preampDb : 0.0;
+    simp_eq_publish();
+}
+
+/* ---------------------------------------------------------------- normalization */
+
+/* Stored as the float's bits: C atomics take integers and pointers, not floats. */
+static volatile uint32_t g_norm_bits = 0x3F800000u; /* 1.0f */
+
+/* Linear gain for loudness normalization (1 = off). */
+void simp_normalize_set(float gain) {
+    if (!(gain > 0.0f) || gain > 4.0f) gain = 1.0f;
+    uint32_t bits;
+    memcpy(&bits, &gain, sizeof(bits));
+    __atomic_store_n(&g_norm_bits, bits, __ATOMIC_RELEASE);
+}
+
+static float simp_norm_gain(void) {
+    uint32_t bits = __atomic_load_n(&g_norm_bits, __ATOMIC_ACQUIRE);
+    float gain;
+    memcpy(&gain, &bits, sizeof(gain));
+    return gain;
+}
+
+/* ---------------------------------------------------------------- echo (ffmpeg aecho shape) */
+
+typedef struct {
+    int taps;
+    int delay[SIMP_MAX_TAPS];
+    float decay[SIMP_MAX_TAPS];
+    float inGain, outGain;
+    int size;
+    float* ring[SIMP_SLOTS][SIMP_CH];
+    int head[SIMP_SLOTS][SIMP_CH];
+} SimpEcho;
+
+static SimpEcho* volatile g_echo = NULL;
+
+static void simp_echo_free(void* p) {
+    SimpEcho* e = (SimpEcho*)p;
+    for (int s = 0; s < SIMP_SLOTS; s++) for (int c = 0; c < SIMP_CH; c++) free(e->ring[s][c]);
+    free(e);
+}
+
+/* n == 0 turns the echo off. Delays in ms; built for the current sample rate. */
+void simp_echo_set(const double* delaysMs, const float* decays, int n, float inGain, float outGain) {
+    SimpEcho* fresh = NULL;
+    if (n > 0) {
+        if (n > SIMP_MAX_TAPS) n = SIMP_MAX_TAPS;
+        fresh = (SimpEcho*)calloc(1, sizeof(SimpEcho));
+        fresh->taps = n;
+        fresh->inGain = inGain;
+        fresh->outGain = outGain;
+        int maxDelay = 1;
+        for (int k = 0; k < n; k++) {
+            int d = (int)(delaysMs[k] * g_rate / 1000.0);
+            if (d < 1) d = 1;
+            fresh->delay[k] = d;
+            fresh->decay[k] = decays[k];
+            if (d > maxDelay) maxDelay = d;
+        }
+        fresh->size = maxDelay + 1;
+        for (int s = 0; s < SIMP_SLOTS; s++)
+            for (int c = 0; c < SIMP_CH; c++) fresh->ring[s][c] = (float*)calloc((size_t)fresh->size, sizeof(float));
+    }
+    SimpEcho* old = __atomic_exchange_n(&g_echo, fresh, __ATOMIC_ACQ_REL);
+    simp_free_later(old, simp_echo_free);
+}
+
+static void simp_echo_process(SimpEcho* e, int slot, int ch, float* data, int frames) {
+    float* ring = e->ring[slot][ch];
+    int head = e->head[slot][ch];
+    for (int i = 0; i < frames; i++) {
+        float x = data[i];
+        ring[head] = x;
+        float y = x * e->inGain;
+        for (int k = 0; k < e->taps; k++) {
+            int idx = head - e->delay[k];
+            if (idx < 0) idx += e->size;
+            y += e->decay[k] * ring[idx];
+        }
+        data[i] = y * e->outGain;
+        if (++head == e->size) head = 0;
+    }
+    e->head[slot][ch] = head;
+}
+
+/* ---------------------------------------------------------------- reverb (partitioned convolution) */
+
+typedef struct {
+    float* fdlRe[SIMP_CH];
+    float* fdlIm[SIMP_CH];
+    int fdlHead[SIMP_CH];
+    float hist[SIMP_CH][SIMP_RB_BLOCK];
+    float cur[SIMP_CH][SIMP_RB_BLOCK];
+    float wet[SIMP_CH][SIMP_RB_BLOCK];
+    int pos[SIMP_CH];
+    float time[SIMP_RB_N];
+    float accRe[SIMP_RB_BLOCK];
+    float accIm[SIMP_RB_BLOCK];
+} SimpReverbSlot;
+
+typedef struct {
+    FFTSetup setup;
+    int channels;
+    int partitions;
+    float mix;
+    float* irRe[SIMP_CH];
+    float* irIm[SIMP_CH];
+    SimpReverbSlot* slot[SIMP_SLOTS];
+} SimpReverb;
+
+static SimpReverb* volatile g_reverb = NULL;
+
+static void simp_fft_forward(FFTSetup setup, float* input, float* re, float* im) {
+    DSPSplitComplex split = { re, im };
+    vDSP_ctoz((const DSPComplex*)input, 2, &split, 1, SIMP_RB_BLOCK);
+    vDSP_fft_zrip(setup, &split, 1, SIMP_RB_LOG2N, FFT_FORWARD);
+}
+
+static void simp_reverb_free(void* p) {
+    SimpReverb* r = (SimpReverb*)p;
+    for (int c = 0; c < SIMP_CH; c++) { free(r->irRe[c]); free(r->irIm[c]); }
+    for (int s = 0; s < SIMP_SLOTS; s++) {
+        if (!r->slot[s]) continue;
+        for (int c = 0; c < SIMP_CH; c++) { free(r->slot[s]->fdlRe[c]); free(r->slot[s]->fdlIm[c]); }
+        free(r->slot[s]);
+    }
+    vDSP_destroy_fftsetup(r->setup);
+    free(r);
+}
+
+/* irR may equal irL (mono). len == 0 turns the reverb off. Returns 1 when built. */
+int simp_reverb_set(const float* irL, const float* irR, int len, float mix) {
+    SimpReverb* fresh = NULL;
+    if (len > 0 && irL != NULL) {
+        fresh = (SimpReverb*)calloc(1, sizeof(SimpReverb));
+        fresh->setup = vDSP_create_fftsetup(SIMP_RB_LOG2N, FFT_RADIX2);
+        fresh->channels = SIMP_CH;
+        fresh->partitions = (len + SIMP_RB_BLOCK - 1) / SIMP_RB_BLOCK;
+        if (fresh->partitions < 1) fresh->partitions = 1;
+        fresh->mix = mix < 0 ? 0 : (mix > 1 ? 1 : mix);
+        size_t bins = (size_t)fresh->partitions * SIMP_RB_BLOCK;
+        float* time = (float*)calloc(SIMP_RB_N, sizeof(float));
+        for (int c = 0; c < SIMP_CH; c++) {
+            const float* h = (c == 0 || irR == NULL) ? irL : irR;
+            fresh->irRe[c] = (float*)calloc(bins, sizeof(float));
+            fresh->irIm[c] = (float*)calloc(bins, sizeof(float));
+            for (int p = 0; p < fresh->partitions; p++) {
+                memset(time, 0, SIMP_RB_N * sizeof(float));
+                for (int i = 0; i < SIMP_RB_BLOCK; i++) {
+                    int src = p * SIMP_RB_BLOCK + i;
+                    if (src < len) time[i] = h[src];
+                }
+                simp_fft_forward(fresh->setup, time, fresh->irRe[c] + (size_t)p * SIMP_RB_BLOCK, fresh->irIm[c] + (size_t)p * SIMP_RB_BLOCK);
+            }
+        }
+        free(time);
+        for (int s = 0; s < SIMP_SLOTS; s++) {
+            SimpReverbSlot* st = (SimpReverbSlot*)calloc(1, sizeof(SimpReverbSlot));
+            for (int c = 0; c < SIMP_CH; c++) {
+                st->fdlRe[c] = (float*)calloc(bins, sizeof(float));
+                st->fdlIm[c] = (float*)calloc(bins, sizeof(float));
+            }
+            fresh->slot[s] = st;
+        }
+    }
+    SimpReverb* old = __atomic_exchange_n(&g_reverb, fresh, __ATOMIC_ACQ_REL);
+    simp_free_later(old, simp_reverb_free);
+    return fresh != NULL;
+}
+
+static void simp_reverb_block(SimpReverb* r, SimpReverbSlot* st, int c) {
+    const int half = SIMP_RB_BLOCK;
+    for (int i = 0; i < SIMP_RB_BLOCK; i++) { st->time[i] = st->hist[c][i]; st->time[SIMP_RB_BLOCK + i] = st->cur[c][i]; }
+    int head = st->fdlHead[c];
+    simp_fft_forward(r->setup, st->time, st->fdlRe[c] + (size_t)head * half, st->fdlIm[c] + (size_t)head * half);
+    vDSP_vclr(st->accRe, 1, half);
+    vDSP_vclr(st->accIm, 1, half);
+    float dc = 0, nyq = 0;
+    DSPSplitComplex acc = { st->accRe, st->accIm };
+    for (int p = 0; p < r->partitions; p++) {
+        int slot = head - p;
+        if (slot < 0) slot += r->partitions;
+        float* xr = st->fdlRe[c] + (size_t)slot * half;
+        float* xi = st->fdlIm[c] + (size_t)slot * half;
+        float* hr = r->irRe[c] + (size_t)p * half;
+        float* hi = r->irIm[c] + (size_t)p * half;
+        /* Bin 0 packs DC (real) and Nyquist (imaginary): multiply them separately. */
+        dc += xr[0] * hr[0];
+        nyq += xi[0] * hi[0];
+        DSPSplitComplex x = { xr, xi }, h = { hr, hi };
+        vDSP_zvma(&x, 1, &h, 1, &acc, 1, &acc, 1, half);
+    }
+    st->accRe[0] = dc;
+    st->accIm[0] = nyq;
+    vDSP_fft_zrip(r->setup, &acc, 1, SIMP_RB_LOG2N, FFT_INVERSE);
+    vDSP_ztoc(&acc, 1, (DSPComplex*)st->time, 2, half);
+    /* vDSP's packed forward is 2x the DFT and its inverse is unnormalised: 1/(4N) overall. */
+    const float scale = 1.0f / (4.0f * SIMP_RB_N);
+    for (int i = 0; i < SIMP_RB_BLOCK; i++) st->wet[c][i] = st->time[SIMP_RB_BLOCK + i] * scale;
+    st->fdlHead[c] = (head + 1 == r->partitions) ? 0 : head + 1;
+    memcpy(st->hist[c], st->cur[c], sizeof(st->hist[c]));
+}
+
+static void simp_reverb_process(SimpReverb* r, int slotIndex, int c, float* data, int frames) {
+    SimpReverbSlot* st = r->slot[slotIndex];
+    int pos = st->pos[c];
+    const float mix = r->mix;
+    for (int i = 0; i < frames; i++) {
+        float x = data[i];
+        float y = (1.0f - mix) * st->hist[c][pos] + mix * st->wet[c][pos];
+        st->cur[c][pos] = x;
+        data[i] = y;
+        if (++pos == SIMP_RB_BLOCK) { simp_reverb_block(r, st, c); pos = 0; }
+    }
+    st->pos[c] = pos;
+}
+
+/* ---------------------------------------------------------------- chain */
+
+static void simp_limit(float* data, int frames) {
+    const float headroom = 1.0f - SIMP_LIMIT_KNEE;
+    for (int i = 0; i < frames; i++) {
+        float x = data[i];
+        if (!isfinite(x)) { data[i] = 0; continue; }
+        float a = fabsf(x);
+        if (a > SIMP_LIMIT_KNEE) {
+            float over = (a - SIMP_LIMIT_KNEE) / headroom;
+            float y = SIMP_LIMIT_KNEE + headroom * (over / (1.0f + over));
+            data[i] = x < 0 ? -y : y;
+        }
+    }
+}
+
+/* Runs the whole chain over one channel of float samples, in place. Exposed for tests too. */
+void simp_process_channel(int slot, int ch, float* data, int frames) {
+    if (slot < 0 || slot >= SIMP_SLOTS || ch < 0 || ch >= SIMP_CH || data == NULL) return;
+    SimpEq* eq = __atomic_load_n(&g_eq, __ATOMIC_ACQUIRE);
+    SimpEcho* echo = __atomic_load_n(&g_echo, __ATOMIC_ACQUIRE);
+    SimpReverb* rev = __atomic_load_n(&g_reverb, __ATOMIC_ACQUIRE);
+    float norm = simp_norm_gain();
+    int eqOn = eq != NULL && eq->active;
+    if (!eqOn && echo == NULL && rev == NULL && norm == 1.0f) return;
+
+    float pre = (eqOn ? eq->preamp : 1.0f) * norm;
+    if (pre != 1.0f) vDSP_vsmul(data, 1, &pre, data, 1, (vDSP_Length)frames);
+    if (eqOn) {
+        double (*z)[2] = g_eq_state[slot][ch];
+        for (int i = 0; i < frames; i++) {
+            double x = data[i];
+            for (int b = 0; b < SIMP_BANDS; b++) {
+                const double* c = eq->c[b];
+                double y = c[0] * x + z[b][0];
+                z[b][0] = c[1] * x - c[3] * y + z[b][1];
+                z[b][1] = c[2] * x - c[4] * y;
+                x = y;
+            }
+            data[i] = (float)x;
+        }
+    }
+    if (echo != NULL) simp_echo_process(echo, slot, ch, data, frames);
+    if (rev != NULL) simp_reverb_process(rev, slot, ch, data, frames);
+    simp_limit(data, frames);
+}
+
+/* ---------------------------------------------------------------- MTAudioProcessingTap */
+
+static int g_float_ni[SIMP_SLOTS];
+
+static int simp_tap_slot(MTAudioProcessingTapRef tap) {
+    long v = (long)MTAudioProcessingTapGetStorage(tap) - 1;
+    return (v < 0 || v >= SIMP_SLOTS) ? 0 : (int)v;
+}
+
+static void simp_tap_init(MTAudioProcessingTapRef tap, void* clientInfo, void** storageOut) {
+    *storageOut = clientInfo;
+}
+
+static void simp_tap_prepare(MTAudioProcessingTapRef tap, CMItemCount maxFrames, const AudioStreamBasicDescription* fmt) {
+    int slot = simp_tap_slot(tap);
+    g_float_ni[slot] = (fmt->mFormatFlags & kAudioFormatFlagIsFloat) && (fmt->mFormatFlags & kAudioFormatFlagIsNonInterleaved);
+    memset(g_eq_state[slot], 0, sizeof(g_eq_state[slot]));
+    if (fmt->mSampleRate > 0 && fmt->mSampleRate != g_rate) {
+        g_rate = fmt->mSampleRate;
+        simp_eq_publish(); /* coefficients depend on the rate (prepare is not the render path) */
+    }
+}
+
+static void simp_tap_process(MTAudioProcessingTapRef tap, CMItemCount frames, MTAudioProcessingTapFlags flags,
+                             AudioBufferList* buffers, CMItemCount* framesOut, MTAudioProcessingTapFlags* flagsOut) {
+    if (MTAudioProcessingTapGetSourceAudio(tap, frames, buffers, flagsOut, NULL, framesOut) != noErr) return;
+    int slot = simp_tap_slot(tap);
+    if (!g_float_ni[slot]) return;
+    int n = (int)*framesOut;
+    for (UInt32 c = 0; c < buffers->mNumberBuffers && c < SIMP_CH; c++) {
+        simp_process_channel(slot, (int)c, (float*)buffers->mBuffers[c].mData, n);
+    }
+}
+
+/* A retained tap for slot 0 or 1, or NULL. Hand it to AVMutableAudioMixInputParameters. */
+MTAudioProcessingTapRef simp_create_tap(int slot) {
+    if (slot < 0 || slot >= SIMP_SLOTS) slot = 0;
+    MTAudioProcessingTapCallbacks cb;
+    memset(&cb, 0, sizeof(cb));
+    cb.version = kMTAudioProcessingTapCallbacksVersion_0;
+    cb.clientInfo = (void*)(long)(slot + 1);
+    cb.init = simp_tap_init;
+    cb.prepare = simp_tap_prepare;
+    cb.process = simp_tap_process;
+    MTAudioProcessingTapRef tap = NULL;
+    if (MTAudioProcessingTapCreate(kCFAllocatorDefault, &cb, kMTAudioProcessingTapCreationFlag_PostEffects, &tap) != noErr) return NULL;
+    return tap;
+}
+
+/* Sample rate the echo is built for (Kotlin generates the reverb IR at the same rate). */
+double simp_sample_rate(void) { return g_rate; }
