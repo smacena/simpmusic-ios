@@ -476,6 +476,24 @@ actor InnerTube {
         return out
     }
 
+    // MARK: Video stream
+
+    /// The best H.264 video-only stream up to 720p (iOS plays AVC everywhere; VP9/AV1 vary).
+    func videoStream(for videoId: String) async throws -> URL {
+        let json = try await post("player", client: Self.visionOS, body: [
+            "videoId": videoId,
+            "contentCheckOk": true,
+            "racyCheckOk": true,
+            "playbackContext": ["contentPlaybackContext": ["signatureTimestamp": 20073]],
+        ])
+        guard (json["playabilityStatus"] as? [String: Any])?["status"] as? String == "OK" else { throw InnerTubeError.unplayable("video") }
+        let formats = ((json["streamingData"] as? [String: Any])?["adaptiveFormats"] as? [[String: Any]]) ?? []
+        let avc = formats.filter { ($0["mimeType"] as? String)?.hasPrefix("video/mp4; codecs=\"avc1") == true && $0["url"] != nil }
+        let pick = avc.filter { ($0["height"] as? Int ?? 0) <= 720 }.max { ($0["height"] as? Int ?? 0) < ($1["height"] as? Int ?? 0) } ?? avc.first
+        guard let s = pick?["url"] as? String, let url = URL(string: s) else { throw InnerTubeError.noAudio }
+        return url
+    }
+
     // MARK: Audio stream
 
     /// The AAC stream of [videoId] from the VISIONOS client.

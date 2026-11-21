@@ -93,7 +93,24 @@ struct PlayerView: View {
         return "Temporizador de sono"
     }
 
+    @ViewBuilder
     private var cover: some View {
+        if player.videoMode {
+            ZStack {
+                VideoView(player: player.videoPlayer)
+                if !player.videoReady {
+                    artworkImage
+                    ProgressView().tint(.white).padding(10).background(.black.opacity(0.4), in: Circle())
+                }
+            }
+            .aspectRatio(16 / 9, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else {
+            artworkImage
+        }
+    }
+
+    private var artworkImage: some View {
         AsyncImage(url: player.current?.artworkLarge) { image in image.resizable().scaledToFit() } placeholder: {
             RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.08)).aspectRatio(1, contentMode: .fit)
         }
@@ -176,6 +193,13 @@ struct PlayerView: View {
             Button { showInfo = true } label: { Image(systemName: "info.circle.fill") }
             RoutePicker().frame(width: 30, height: 30)
             Button { showLyrics = true } label: { Image(systemName: "text.bubble.fill") }
+            Button { player.toggleVideo() } label: {
+                if player.videoLoading { ProgressView().tint(.white) } else {
+                    Image(systemName: player.videoMode ? "music.note" : "play.rectangle.fill").foregroundStyle(player.videoMode ? Theme.seed : .white)
+                }
+            }
+            .frame(width: 34, height: 34)
+            .contentShape(Rectangle())
             Spacer()
             if let track = player.current {
                 Button { library.toggleFavorite(track) } label: { Image(systemName: "text.badge.plus") }

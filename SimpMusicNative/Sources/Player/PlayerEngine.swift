@@ -20,6 +20,13 @@ final class PlayerEngine: ObservableObject {
     /// Where the queue came from, shown as "TOCANDO AGORA / <title>" in the player.
     @Published private(set) var queueTitle: String = "Fila"
     @Published private(set) var rate: Float = 1
+    /// True while the current song plays as its music video (video + audio composition).
+    @Published private(set) var videoMode = false
+    @Published private(set) var videoLoading = false
+    /// True once the video shows its first frames (until then the player keeps the cover up).
+    @Published private(set) var videoReady = false
+    /// The player whose picture the video view shows.
+    var avPlayer: AVPlayer { player }
     @Published private(set) var sleepDeadline: Date?
     @Published private(set) var sleepAtEndOfTrack = false
     private var sleepTask: Task<Void, Never>?
@@ -168,6 +175,69 @@ final class PlayerEngine: ObservableObject {
 
     func cycleRepeat() { repeatMode = (repeatMode + 1) % 3 }
 
+    // MARK: Music video
+
+    /// The music video's picture: a muted video-only player kept in step with the audio player,
+    /// so switching is instant and the sound stays the high-quality AAC with the audio chain.
+    let videoPlayer: AVPlayer = {
+        let p = AVPlayer()
+        p.isMuted = true
+        p.automaticallyWaitsToMinimizeStalling = true
+        return p
+    }()
+
+    /// Switches the current song between audio only and its music video.
+    func toggleVideo() {
+        guard let track = current else { return }
+        if videoMode {
+            videoMode = false
+            videoReady = false
+            videoPlayer.pause()
+            videoPlayer.replaceCurrentItem(with: nil)
+            return
+        }
+        videoReady = false
+        videoLoading = true
+        Task {
+            defer { videoLoading = false }
+            do {
+                let url = try await InnerTube.shared.videoStream(for: track.id)
+                guard current?.id == track.id else { return }
+                videoPlayer.replaceCurrentItem(with: AVPlayerItem(url: url))
+                await videoPlayer.seek(to: player.currentTime(), toleranceBefore: .zero, toleranceAfter: .zero)
+                videoPlayer.rate = isPlaying ? rate : 0
+                videoMode = true
+            } catch {
+                NSLog("SimpNative: video failed: \(error)")
+                errorMessage = "Vídeo indisponível para esta música"
+            }
+        }
+    }
+
+    /// Called every clock tick: mirrors play/pause and corrects drift over 150 ms.
+    private func syncVideo() {
+        guard videoMode, videoPlayer.currentItem != nil else { return }
+        if UIApplication.shared.applicationState == .background {
+            if videoPlayer.rate != 0 { videoPlayer.pause() }
+            return
+        }
+        let target: Float = isPlaying ? rate : 0
+        if videoPlayer.rate != target { videoPlayer.rate = target }
+        let ready = videoPlayer.currentItem?.status == .readyToPlay && (videoPlayer.timeControlStatus == .playing || !isPlaying)
+        if ready != videoReady { videoReady = ready }
+        // Correct drift only once the video is actually playing, and not more than every 2 s:
+        // seeking an item that is still buffering restarts its buffering and it never starts.
+        guard videoPlayer.currentItem?.status == .readyToPlay, videoPlayer.timeControlStatus == .playing,
+              Date().timeIntervalSince(lastVideoSeek) > 2 else { return }
+        let drift = abs(videoPlayer.currentTime().seconds - player.currentTime().seconds)
+        if drift.isFinite, drift > 0.15 {
+            lastVideoSeek = Date()
+            videoPlayer.seek(to: player.currentTime(), toleranceBefore: .zero, toleranceAfter: .zero)
+        }
+    }
+
+    private var lastVideoSeek = Date.distantPast
+
     // MARK: Speed and sleep timer
 
     func setRate(_ value: Float) {
@@ -230,6 +300,11 @@ final class PlayerEngine: ObservableObject {
         guard let track = current else { return }
         loadTask?.cancel()
         finishCrossfade()
+        if videoMode {
+            videoMode = false
+            videoPlayer.pause()
+            videoPlayer.replaceCurrentItem(with: nil)
+        }
         player.pause()
         isLoading = true
         position = start
@@ -457,6 +532,7 @@ final class PlayerEngine: ObservableObject {
         let seconds = player.currentTime().seconds
         if seconds.isFinite { position = seconds }
         updatePlayingState()
+        syncVideo()
         if isPlaying, Date().timeIntervalSince(lastPersist) > 10 { persistQueue() }
         // With the inflated length AVPlayer may keep "playing" past the real end, or wait for
         // bytes that don't exist just before it: either way, that is the end of the track.
