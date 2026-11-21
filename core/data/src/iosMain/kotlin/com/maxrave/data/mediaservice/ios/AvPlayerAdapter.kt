@@ -76,7 +76,9 @@ import platform.Foundation.NSNumber
 import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSURL
 import platform.darwin.NSObjectProtocol
+import kotlin.math.pow
 import kotlin.random.Random
+import com.maxrave.data.native.dsp.simp_normalize_set
 import kotlin.time.TimeSource
 
 /**
@@ -112,6 +114,7 @@ class AvPlayerAdapter(
     private var crossfadeDurationMs = 5_000
     private var skipCrossfadeInAlbum = false
     private var userVolume = 1f
+    private var normalizeEnabled = false
 
     /** The AVPlayer itself, for the video surface in the UI (MediaPlayerViewWithSubtitle). */
     val avPlayer: AVPlayer get() = player
@@ -203,6 +206,12 @@ class AvPlayerAdapter(
         pollJob = coroutineScope.launch { pollLoop() }
         coroutineScope.launch {
             dataStoreManager.watchVideoInsteadOfPlayingAudio.collect { watchVideoEnabled = it == DataStoreManager.TRUE }
+        }
+        coroutineScope.launch {
+            dataStoreManager.normalizeVolume.collect {
+                normalizeEnabled = it == DataStoreManager.TRUE
+                loadedMediaId?.let { id -> applyNormalization(id) }
+            }
         }
         coroutineScope.launch { dataStoreManager.crossfadeEnabled.collect { crossfadeEnabled = it == DataStoreManager.TRUE } }
         coroutineScope.launch { dataStoreManager.crossfadeDuration.collect { crossfadeDurationMs = it } }
@@ -755,6 +764,7 @@ class AvPlayerAdapter(
         if (mediaId != playlist.getOrNull(index)?.mediaId) return
         val avItem = AVPlayerItem(asset = asset)
         if (tracksLoaded) attachEqualizer(avItem)
+        applyNormalization(mediaId)
         urlExpiresAtSec = Regex("[?&]expire=(\\d+)").find(url)?.groupValues?.get(1)?.toLongOrNull()
         currentIsVideo = false
         player.replaceCurrentItemWithPlayerItem(avItem)
@@ -818,6 +828,7 @@ class AvPlayerAdapter(
         urlExpiresAtSec = Regex("[?&]expire=(\\d+)").find(audioUrl)?.groupValues?.get(1)?.toLongOrNull()
         val compositionItem = AVPlayerItem(asset = composition)
         attachEqualizer(compositionItem) // before playing, for the same reason as in playUrl
+        applyNormalization(mediaId)
         player.replaceCurrentItemWithPlayerItem(compositionItem)
         loadedMediaId = mediaId
         if (startPositionMs > 0) player.seekToTime(CMTimeMakeWithSeconds(startPositionMs / 1000.0, 1000))
@@ -839,6 +850,23 @@ class AvPlayerAdapter(
         if (item.audioMix != null) return
         val track = item.asset.tracksWithMediaType(AVMediaTypeAudio).firstOrNull() as? AVAssetTrack ?: return
         equalizerAudioMix(track, currentSlot)?.let { item.audioMix = it }
+    }
+
+    /**
+     * Volume normalization: YouTube reports each track's loudness relative to its reference level
+     * (`loudnessDb`, positive = louder). The gain undoes it — louder tracks are turned down, quieter
+     * ones up by at most 6 dB, with the C limiter guarding the boost — and is applied in the audio
+     * tap. Off, or when the format carries no loudness, the gain is 1.
+     */
+    private suspend fun applyNormalization(mediaId: String) {
+        val gain =
+            if (!normalizeEnabled) {
+                1f
+            } else {
+                val db = runCatching { streamRepository.getNewFormat(mediaId).lastOrNull()?.loudnessDb }.getOrNull()
+                if (db == null) 1f else 10f.pow(-db / 20f).coerceIn(0.25f, 2f)
+            }
+        simp_normalize_set(gain)
     }
 
     override fun setAudioEffects(effects: AudioEffects) {
@@ -1104,6 +1132,7 @@ class AvPlayerAdapter(
         player = incoming
         currentSlot = 1 - currentSlot
         attachEqualizer(item)
+        applyNormalization(next.mediaId)
         index = nextIndex
         loadedMediaId = next.mediaId
         cachedPosition = 0

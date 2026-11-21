@@ -51,6 +51,8 @@ kotlin {
         iosArm64(),
         iosSimulatorArm64(),
     ).forEach { iosTarget ->
+        // Real-time audio processing in C (see src/nativeInterop/cinterop/simpdsp.def).
+        iosTarget.compilations.getByName("main").cinterops.create("simpdsp")
         iosTarget.binaries.framework {
             baseName = xcfName
             isStatic = true

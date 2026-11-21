@@ -1459,7 +1459,8 @@ fun SettingScreen(
                 }
             }
         }
-        if (getPlatform() == Platform.Android) {
+        // Audio: normalization on Android and iOS; skip-silence and the system EQ are Android-only.
+        if (getPlatform() == Platform.Android || getPlatform() == Platform.iOS) {
             item(key = "audio") {
                 SettingGroup(title = stringResource(Res.string.audio)) {
                     SettingItem(
@@ -1467,6 +1468,7 @@ fun SettingScreen(
                         subtitle = stringResource(Res.string.balance_media_loudness),
                         switch = (normalizeVolume to { viewModel.setNormalizeVolume(it) }),
                     )
+                    if (getPlatform() == Platform.Android) {
                     SettingItem(
                         title = stringResource(Res.string.skip_silent),
                         subtitle = stringResource(Res.string.skip_no_music_part),
@@ -1516,6 +1518,7 @@ fun SettingScreen(
                                 }
                             },
                         )
+                    }
                     }
                 }
             }
