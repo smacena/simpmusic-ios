@@ -6,9 +6,33 @@ struct SettingsView: View {
     @State private var normalize = PlayerEngine.shared.normalizeVolume
     @State private var crossfade = PlayerEngine.shared.crossfadeEnabled
     @State private var crossfadeSeconds = PlayerEngine.shared.crossfadeSeconds
+    @ObservedObject private var account = Account.shared
+    @State private var showLogin = false
+    @State private var backupURL: URL?
+    @State private var importing = false
+    @State private var message: String?
 
     var body: some View {
         Form {
+            Section("Conta do YouTube") {
+                if account.isSignedIn {
+                    Label("Conectado", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Button("Sair da conta", role: .destructive) { account.signOut() }
+                } else {
+                    Button("Entrar com Google") { showLogin = true }
+                    Text("Opcional. Personaliza o início e mostra suas músicas curtidas. A senha é digitada só na página do Google.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Section("Backup") {
+                Button("Criar backup") {
+                    do { backupURL = try Backup.export() } catch { message = "Falha ao criar o backup." }
+                }
+                if let backupURL {
+                    ShareLink(item: backupURL) { Label("Compartilhar backup", systemImage: "square.and.arrow.up") }
+                }
+                Button("Restaurar backup") { importing = true }
+            }
             Section("Áudio") {
                 Toggle("Normalizar volume", isOn: $normalize)
                     .onChange(of: normalize) { _, value in player.normalizeVolume = value }
@@ -58,6 +82,17 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Ajustes")
+        .sheet(isPresented: $showLogin) { LoginView() }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+            guard case let .success(url) = result else { return }
+            do {
+                try Backup.restore(from: url)
+                message = "Backup restaurado. Reabra o app para aplicar os ajustes de áudio."
+            } catch { message = "Arquivo de backup inválido." }
+        }
+        .alert(message ?? "", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK", role: .cancel) {}
+        }
     }
 }
 

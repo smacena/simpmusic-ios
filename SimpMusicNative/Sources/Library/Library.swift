@@ -48,6 +48,18 @@ final class Library: ObservableObject {
         try? FileManager.default.removeItem(at: Downloads.fileURL(for: track.id))
     }
 
+    /// Used by backup restore.
+    func replaceAll(favorites: [Track], recent: [Track], downloaded: [Track], queue: SavedQueue?) {
+        self.favorites = favorites
+        self.recent = recent
+        // Only songs whose file is actually on this device count as downloaded.
+        self.downloaded = downloaded.filter { Downloads.localFile(for: $0.id) != nil }
+        save(self.favorites, "favorites")
+        save(self.recent, "recent")
+        save(self.downloaded, "downloaded")
+        if let queue { saveQueue(queue) }
+    }
+
     // MARK: Saved queue
 
     struct SavedQueue: Codable {

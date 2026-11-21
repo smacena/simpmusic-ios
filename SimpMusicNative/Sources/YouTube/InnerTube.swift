@@ -149,6 +149,10 @@ actor InnerTube {
         request.setValue("https://music.youtube.com/", forHTTPHeaderField: "Referer")
         request.setValue(client.userAgent, forHTTPHeaderField: "User-Agent")
         if let v = visitorData { request.setValue(v, forHTTPHeaderField: "X-Goog-Visitor-Id") }
+        // Signed in: YouTube Music requests carry the session (the stream client never does).
+        if client.name == Self.webRemix.name, let auth = Account.authHeaders() {
+            for (key, value) in auth { request.setValue(value, forHTTPHeaderField: key) }
+        }
         let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200 ..< 300).contains(status) else { throw InnerTubeError.http(status) }
