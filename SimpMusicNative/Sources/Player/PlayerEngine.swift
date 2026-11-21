@@ -20,7 +20,19 @@ final class PlayerEngine: ObservableObject {
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
 
-    private let player = AVPlayer()
+    private var player = AVPlayer()
+    /// The outgoing track's player while a crossfade runs.
+    private var fadingOut: AVPlayer?
+    private var crossfadeTask: Task<Void, Never>?
+    /// Which C tap slot the current item uses; a crossfade alternates it.
+    private var currentSlot: Int32 = 0
+
+    var crossfadeEnabled: Bool = UserDefaults.standard.bool(forKey: "crossfade.enabled") {
+        didSet { UserDefaults.standard.set(crossfadeEnabled, forKey: "crossfade.enabled") }
+    }
+    var crossfadeSeconds: Double = UserDefaults.standard.object(forKey: "crossfade.seconds") as? Double ?? 5 {
+        didSet { UserDefaults.standard.set(crossfadeSeconds, forKey: "crossfade.seconds") }
+    }
     private var stream: AudioStream?
     private var prefetched: [String: AudioStream] = [:]
     private var loadTask: Task<Void, Never>?
@@ -46,14 +58,18 @@ final class PlayerEngine: ObservableObject {
         setUpAudioSession()
         observeSession()
         setUpRemoteCommands()
-        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 4), queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
-        }
+        attachClock()
         AudioEffects.shared.applyStored()
         restoreQueue()
         sessionObservers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.persistQueue() }
         })
+    }
+
+    private func attachClock() {
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 4), queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
     }
 
     // MARK: Saved queue
@@ -92,6 +108,7 @@ final class PlayerEngine: ObservableObject {
 
     func pause() {
         wantsToPlay = false
+        finishCrossfade()
         player.pause()
         updatePlayingState()
     }
@@ -139,6 +156,7 @@ final class PlayerEngine: ObservableObject {
     func seek(to seconds: Double) {
         // Past the real end lies only the inflated tail AVFoundation imagines.
         let target = duration > 0 ? min(max(0, seconds), duration - 0.5) : max(0, seconds)
+        finishCrossfade()
         position = target
         player.seek(to: CMTime(seconds: target, preferredTimescale: 1000), toleranceBefore: .zero, toleranceAfter: .zero)
         publishNowPlaying()
@@ -149,6 +167,7 @@ final class PlayerEngine: ObservableObject {
     private func load(startAt start: Double = 0, forceFresh: Bool = false) {
         guard let track = current else { return }
         loadTask?.cancel()
+        finishCrossfade()
         player.pause()
         isLoading = true
         position = start
@@ -204,7 +223,7 @@ final class PlayerEngine: ObservableObject {
         // AVFoundation stop, rebuild and resume its pipeline — an audible hiccup.
         let tracks = try? await asset.loadTracks(withMediaType: .audio)
         let item = AVPlayerItem(asset: asset)
-        if let audio = tracks?.first, let mix = Self.audioMix(for: audio) { item.audioMix = mix }
+        if let audio = tracks?.first, let mix = Self.audioMix(for: audio, slot: currentSlot) { item.audioMix = mix }
         applyNormalization()
         player.replaceCurrentItem(with: item)
         if start > 0 { await player.seek(to: CMTime(seconds: start, preferredTimescale: 1000)) }
@@ -225,8 +244,8 @@ final class PlayerEngine: ObservableObject {
         NSLog("SimpNative: playing \(current?.id ?? "?") dur=\(Int(duration))s")
     }
 
-    private static func audioMix(for track: AVAssetTrack) -> AVAudioMix? {
-        guard let tap = simp_create_tap(0) else { return nil }
+    private static func audioMix(for track: AVAssetTrack, slot: Int32) -> AVAudioMix? {
+        guard let tap = simp_create_tap(slot) else { return nil }
         let parameters = AVMutableAudioMixInputParameters(track: track)
         parameters.audioTapProcessor = tap
         let mix = AVMutableAudioMix()
@@ -275,6 +294,83 @@ final class PlayerEngine: ObservableObject {
         }
     }
 
+    // MARK: Crossfade
+
+    /// Starts the next song [crossfadeSeconds] before this one ends and overlaps the two on an
+    /// equal-power curve. Skipped for short songs (under three fade lengths) or when the next
+    /// stream is not resolved yet — then the song just ends and the next starts as usual.
+    private func maybeStartCrossfade() {
+        guard crossfadeEnabled, fadingOut == nil, crossfadeTask == nil, wantsToPlay, isPlaying, !isLoading else { return }
+        let fade = min(max(crossfadeSeconds, 1), 12)
+        guard duration >= fade * 3, position >= duration - fade, index + 1 < queue.count else { return }
+        let next = queue[index + 1]
+        let localURL = Downloads.localFile(for: next.id)
+        guard localURL != nil || prefetched[next.id] != nil else { return }
+        let stream = localURL.map { AudioStream(url: $0, durationMs: 0, loudnessDb: nil, expiresAt: nil) } ?? prefetched.removeValue(forKey: next.id)!
+        crossfadeTask = Task { [weak self] in await self?.runCrossfade(to: next, stream: stream, fade: fade) }
+    }
+
+    private func runCrossfade(to next: Track, stream: AudioStream, fade: Double) async {
+        defer { crossfadeTask = nil }
+        let slot: Int32 = currentSlot == 0 ? 1 : 0
+        let asset = AVURLAsset(url: stream.url)
+        let tracks = try? await asset.loadTracks(withMediaType: .audio)
+        let item = AVPlayerItem(asset: asset)
+        if let audio = tracks?.first, let mix = Self.audioMix(for: audio, slot: slot) { item.audioMix = mix }
+        let incoming = AVPlayer(playerItem: item)
+        incoming.volume = 0
+        var waited = 0.0
+        while item.status != .readyToPlay {
+            if item.status == .failed || waited > fade / 2 || Task.isCancelled { prefetched[next.id] = stream; return }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            waited += 0.1
+        }
+        guard wantsToPlay, !Task.isCancelled else { prefetched[next.id] = stream; return }
+        // Swap: the incoming player becomes the current one; the old one fades out.
+        let outgoing = player
+        if let timeObserver { outgoing.removeTimeObserver(timeObserver) }
+        fadingOut = outgoing
+        player = incoming
+        currentSlot = slot
+        attachClock()
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.trackEnded() }
+        }
+        index += 1
+        self.stream = stream
+        position = 0
+        duration = stream.durationMs > 0 ? Double(stream.durationMs) / 1000 : Double(next.durationText.flatMap(Self.seconds(from:)) ?? 0)
+        incoming.play()
+        applyNormalization()
+        loadArtwork(for: next)
+        publishNowPlaying()
+        Library.shared.addRecent(next)
+        let steps = 50
+        let startVolume = outgoing.volume
+        for step in 1 ... steps {
+            try? await Task.sleep(nanoseconds: UInt64(fade / Double(steps) * 1_000_000_000))
+            guard fadingOut === outgoing else { return }
+            let t = Double(step) / Double(steps)
+            outgoing.volume = startVolume * Float(cos(t * .pi / 2))
+            incoming.volume = Float(sin(t * .pi / 2))
+        }
+        finishCrossfade()
+        prefetchNext()
+        persistQueue()
+    }
+
+    /// Ends a crossfade at once: the outgoing song stops and the current one gets full volume.
+    private func finishCrossfade() {
+        guard let outgoing = fadingOut else { crossfadeTask?.cancel(); crossfadeTask = nil; return }
+        fadingOut = nil
+        crossfadeTask?.cancel()
+        crossfadeTask = nil
+        outgoing.pause()
+        outgoing.replaceCurrentItem(with: nil)
+        player.volume = 1
+    }
+
     // MARK: Clock and stalls
 
     private func tick() {
@@ -286,6 +382,7 @@ final class PlayerEngine: ObservableObject {
         // With the inflated length AVPlayer may keep "playing" past the real end, or wait for
         // bytes that don't exist just before it: either way, that is the end of the track.
         if duration > 0, position >= duration + 1.5 { trackEnded(); return }
+        maybeStartCrossfade()
         let waiting = wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate && !isLoading
         if !waiting { stalledSince = nil; return }
         let since = stalledSince ?? Date()
@@ -347,6 +444,7 @@ final class PlayerEngine: ObservableObject {
         case .began:
             playingBeforeInterruption = wantsToPlay
             wantsToPlay = false
+            finishCrossfade()
             player.pause()
         case .ended:
             let options = AVAudioSession.InterruptionOptions(rawValue: note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0)

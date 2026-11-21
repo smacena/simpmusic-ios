@@ -4,12 +4,20 @@ struct SettingsView: View {
     @EnvironmentObject private var effects: AudioEffects
     @EnvironmentObject private var player: PlayerEngine
     @State private var normalize = PlayerEngine.shared.normalizeVolume
+    @State private var crossfade = PlayerEngine.shared.crossfadeEnabled
+    @State private var crossfadeSeconds = PlayerEngine.shared.crossfadeSeconds
 
     var body: some View {
         Form {
             Section("Áudio") {
                 Toggle("Normalizar volume", isOn: $normalize)
                     .onChange(of: normalize) { _, value in player.normalizeVolume = value }
+                Toggle("Crossfade", isOn: $crossfade)
+                    .onChange(of: crossfade) { _, value in player.crossfadeEnabled = value }
+                if crossfade {
+                    Stepper("Duração: \(Int(crossfadeSeconds)) s", value: $crossfadeSeconds, in: 1 ... 12)
+                        .onChange(of: crossfadeSeconds) { _, value in player.crossfadeSeconds = value }
+                }
             }
             Section("Equalizador") {
                 Toggle("Ativado", isOn: $effects.eqEnabled)
