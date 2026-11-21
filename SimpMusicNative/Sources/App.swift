@@ -11,6 +11,7 @@ struct SimpMusicApp: App {
                 .environmentObject(player)
                 .environmentObject(effects)
                 .preferredColorScheme(.dark)
+                .font(Theme.bodyMedium)
         }
     }
 }

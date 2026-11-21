@@ -230,6 +230,7 @@ actor InnerTube {
 
     struct Shelf: Identifiable {
         let id = UUID()
+        var strapline: String = ""
         let title: String
         let items: [ShelfItem]
     }
@@ -295,7 +296,47 @@ actor InnerTube {
                 }
             }
         }
-        return title.isEmpty || items.isEmpty ? nil : Shelf(title: title, items: items)
+        let strapline = text(header?["strapline"])
+        return title.isEmpty || items.isEmpty ? nil : Shelf(strapline: strapline, title: title, items: items)
+    }
+
+    /// "Moods & genres": each category becomes a shelf of the playlists it opens.
+    func moodsAndGenres() async throws -> [Shelf] {
+        let json = try await post("browse", client: Self.webRemix, body: ["browseId": "FEmusic_moods_and_genres"])
+        var buttons: [(String, String, String)] = [] // title, browseId, params
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let b = dict["musicNavigationButtonRenderer"] as? [String: Any],
+                   let endpoint = (b["clickCommand"] as? [String: Any])?["browseEndpoint"] as? [String: Any],
+                   let id = endpoint["browseId"] as? String {
+                    buttons.append((Self.text(b["buttonText"]), id, endpoint["params"] as? String ?? ""))
+                    return
+                }
+                for value in dict.values { walk(value) }
+            } else if let array = node as? [Any] {
+                for value in array { walk(value) }
+            }
+        }
+        walk(json)
+        var shelves: [Shelf] = []
+        for (title, id, params) in buttons.prefix(8) {
+            var body: [String: Any] = ["browseId": id]
+            if !params.isEmpty { body["params"] = params }
+            guard let page = try? await post("browse", client: Self.webRemix, body: body) else { continue }
+            var items: [ShelfItem] = []
+            func collect(_ node: Any) {
+                if let dict = node as? [String: Any] {
+                    if let shelf = dict["musicCarouselShelfRenderer"] as? [String: Any], let parsed = Self.parseShelf(shelf) { items.append(contentsOf: parsed.items); return }
+                    if let grid = dict["gridRenderer"] as? [String: Any], let parsed = Self.parseShelf(["contents": grid["items"] ?? [], "header": ["musicCarouselShelfBasicHeaderRenderer": ["title": ["runs": [["text": title]]]]]]) { items.append(contentsOf: parsed.items); return }
+                    for value in dict.values { collect(value) }
+                } else if let array = node as? [Any] {
+                    for value in array { collect(value) }
+                }
+            }
+            collect(page)
+            if !items.isEmpty { shelves.append(Shelf(strapline: "Mood", title: title, items: Array(items.prefix(20)))) }
+        }
+        return shelves
     }
 
     /// The songs of a playlist or album page.
@@ -319,6 +360,83 @@ actor InnerTube {
             for value in array { if let u = firstThumbnail(value) { return u } }
         }
         return nil
+    }
+
+    // MARK: Search for albums, artists, playlists
+
+    enum CollectionKind: String, CaseIterable {
+        case albums, artists, playlists
+        var params: String {
+            switch self {
+            case .albums: "EgWKAQIYAWoKEAkQChAFEAMQBA=="
+            case .artists: "EgWKAQIgAWoKEAkQChAFEAMQBA=="
+            case .playlists: "EgeKAQQoAEABagoQAxAEEAoQCRAF"
+            }
+        }
+    }
+
+    func searchCollections(_ query: String, kind: CollectionKind) async throws -> [Collection] {
+        let json = try await post("search", client: Self.webRemix, body: ["query": query, "params": kind.params])
+        var out: [Collection] = []
+        var seen = Set<String>()
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let item = dict["musicResponsiveListItemRenderer"] as? [String: Any],
+                   let browse = ((item["navigationEndpoint"] as? [String: Any])?["browseEndpoint"] as? [String: Any])?["browseId"] as? String,
+                   seen.insert(browse).inserted {
+                    let columns = item["flexColumns"] as? [Any] ?? []
+                    let title = Self.runs(columns.first).compactMap { $0["text"] as? String }.joined()
+                    let subtitle = Self.runs(columns.count > 1 ? columns[1] : nil).compactMap { $0["text"] as? String }.joined()
+                    let thumbs = (((item["thumbnail"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any])?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
+                    let thumb = (thumbs?.last?["url"] as? String).flatMap(URL.init(string:))
+                    if !title.isEmpty { out.append(Collection(browseId: browse, title: title, subtitle: subtitle, thumbnail: thumb)) }
+                    return
+                }
+                for value in dict.values { walk(value) }
+            } else if let array = node as? [Any] {
+                for value in array { walk(value) }
+            }
+        }
+        walk(json)
+        return out
+    }
+
+    // MARK: Artist page
+
+    struct ArtistPage {
+        let name: String
+        let thumbnail: URL?
+        let songs: [Track]
+        let shelves: [Shelf]
+    }
+
+    /// An artist's channel: top songs plus carousels (albums, singles, videos, similar artists).
+    func artist(_ browseId: String) async throws -> ArtistPage {
+        let json = try await post("browse", client: Self.webRemix, body: ["browseId": browseId])
+        let header = ((json["header"] as? [String: Any])?["musicImmersiveHeaderRenderer"] as? [String: Any]) ??
+            ((json["header"] as? [String: Any])?["musicVisualHeaderRenderer"] as? [String: Any])
+        let name = Self.text(header?["title"])
+        let thumbs = (((header?["thumbnail"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any])?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
+        let thumb = (thumbs?.last?["url"] as? String).flatMap(URL.init(string:))
+        var songs: [Track] = []
+        var shelves: [Shelf] = []
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let shelf = dict["musicShelfRenderer"] as? [String: Any] {
+                    songs.append(contentsOf: Self.parseListItems(shelf))
+                    return
+                }
+                if let carousel = dict["musicCarouselShelfRenderer"] as? [String: Any] {
+                    if let parsed = Self.parseShelf(carousel) { shelves.append(parsed) }
+                    return
+                }
+                for value in dict.values { walk(value) }
+            } else if let array = node as? [Any] {
+                for value in array { walk(value) }
+            }
+        }
+        walk(json["contents"] as Any)
+        return ArtistPage(name: name, thumbnail: thumb, songs: songs, shelves: shelves)
     }
 
     // MARK: Radio (what plays after a song)

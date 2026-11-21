@@ -1,29 +1,71 @@
 import SwiftUI
 
+/// SimpMusic's shell: content behind a floating mini player and a floating capsule tab bar
+/// (Início / Biblioteca) with the round search button beside it.
 struct RootView: View {
+    enum Tab { case home, library, search }
     @EnvironmentObject private var player: PlayerEngine
+    @State private var tab: Tab = .home
     @State private var showPlayer = false
 
     var body: some View {
-        TabView {
-            NavigationStack { HomeView() }
-                .tabItem { Label("Início", systemImage: "house.fill") }
-            NavigationStack { SearchView() }
-                .tabItem { Label("Buscar", systemImage: "magnifyingglass") }
-            NavigationStack { LibraryView() }
-                .tabItem { Label("Biblioteca", systemImage: "music.note.list") }
-            NavigationStack { SettingsView() }
-                .tabItem { Label("Ajustes", systemImage: "slider.horizontal.3") }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if player.current != nil {
-                MiniPlayer { showPlayer = true }
-                    .padding(.bottom, 52)
+        ZStack(alignment: .bottom) {
+            Theme.background.ignoresSafeArea()
+            Group {
+                switch tab {
+                case .home: NavigationStack { HomeView() }
+                case .library: NavigationStack { LibraryView() }
+                case .search: NavigationStack { SearchView() }
+                }
             }
+            VStack(spacing: 10) {
+                if player.current != nil {
+                    MiniPlayer { showPlayer = true }
+                }
+                TabBar(tab: $tab)
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 4)
         }
-        .sheet(isPresented: $showPlayer) { PlayerView() }
+        .tint(Theme.seed)
+        .fullScreenCover(isPresented: $showPlayer) { PlayerView() }
         .alert("Erro", isPresented: Binding(get: { player.errorMessage != nil }, set: { if !$0 { player.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(player.errorMessage ?? "") }
+    }
+}
+
+private struct TabBar: View {
+    @Binding var tab: RootView.Tab
+
+    var body: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                item(.home, "house.fill", "Início")
+                item(.library, "music.note.list", "Biblioteca")
+            }
+            .padding(6)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.06)))
+            Button { tab = .search } label: {
+                Image(systemName: "magnifyingglass").font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(tab == .search ? Theme.seed : .white)
+                    .frame(width: 60, height: 60)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().stroke(Color.white.opacity(0.06)))
+            }
+        }
+    }
+
+    private func item(_ value: RootView.Tab, _ icon: String, _ title: String) -> some View {
+        Button { tab = value } label: {
+            VStack(spacing: 2) {
+                Image(systemName: icon).font(.system(size: 20, weight: .semibold))
+                Text(title).font(Theme.poppins(12, .medium))
+            }
+            .foregroundStyle(tab == value ? Theme.seed : Color.white.opacity(0.85))
+            .frame(width: 100, height: 48)
+            .background(tab == value ? Color.white.opacity(0.08) : .clear, in: Capsule())
+        }
     }
 }

@@ -17,6 +17,14 @@ final class PlayerEngine: ObservableObject {
     @Published private(set) var position: Double = 0 // seconds
     @Published private(set) var duration: Double = 0 // seconds
     @Published var errorMessage: String?
+    /// Where the queue came from, shown as "TOCANDO AGORA / <title>" in the player.
+    @Published private(set) var queueTitle: String = "Fila"
+    @Published private(set) var rate: Float = 1
+    @Published private(set) var sleepDeadline: Date?
+    @Published private(set) var sleepAtEndOfTrack = false
+    private var sleepTask: Task<Void, Never>?
+    @Published var shuffleOn = false
+    @Published var repeatMode = 0 // 0 off, 1 all, 2 one
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
 
@@ -96,8 +104,9 @@ final class PlayerEngine: ObservableObject {
     // MARK: Public transport
 
     /// Plays [tracks] from [startIndex]; when the queue runs out, a radio of the last song continues it.
-    func play(_ tracks: [Track], startAt startIndex: Int = 0) {
+    func play(_ tracks: [Track], startAt startIndex: Int = 0, title: String? = nil) {
         guard tracks.indices.contains(startIndex) else { return }
+        if let title { queueTitle = title }
         queue = tracks
         index = startIndex
         wantsToPlay = true
@@ -124,6 +133,7 @@ final class PlayerEngine: ObservableObject {
         if player.currentItem == nil { load(startAt: position); return }
         setActive()
         player.play()
+        if rate != 1 { player.rate = rate }
         updatePlayingState()
     }
 
@@ -144,6 +154,58 @@ final class PlayerEngine: ObservableObject {
             index -= 1
             load()
         }
+    }
+
+    func toggleShuffle() {
+        shuffleOn.toggle()
+        guard shuffleOn, queue.count > index + 2 else { return }
+        // Shuffle what is still to come; the current song keeps playing.
+        let upcoming = queue[(index + 1)...].shuffled()
+        queue.replaceSubrange((index + 1)..., with: upcoming)
+        prefetched.removeAll()
+        prefetchNext()
+    }
+
+    func cycleRepeat() { repeatMode = (repeatMode + 1) % 3 }
+
+    // MARK: Speed and sleep timer
+
+    func setRate(_ value: Float) {
+        rate = value
+        player.currentItem?.audioTimePitchAlgorithm = .spectral // keeps the pitch at other speeds
+        if isPlaying { player.rate = value }
+    }
+
+    /// Pauses after [minutes], fading the volume out over the last five seconds.
+    func setSleepTimer(minutes: Int) {
+        cancelSleepTimer()
+        let deadline = Date().addingTimeInterval(Double(minutes) * 60)
+        sleepDeadline = deadline
+        sleepTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(max(0, deadline.timeIntervalSinceNow - 5) * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            for step in 1 ... 25 {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                if Task.isCancelled { self.player.volume = 1; return }
+                self.player.volume = Float(cos(Double(step) / 25 * .pi / 2))
+            }
+            self.pause()
+            self.player.volume = 1
+            self.sleepDeadline = nil
+        }
+    }
+
+    func setSleepTimerEndOfTrack() {
+        cancelSleepTimer()
+        sleepAtEndOfTrack = true
+    }
+
+    func cancelSleepTimer() {
+        sleepTask?.cancel()
+        sleepTask = nil
+        sleepDeadline = nil
+        sleepAtEndOfTrack = false
+        player.volume = 1
     }
 
     func jump(to newIndex: Int) {
@@ -232,9 +294,11 @@ final class PlayerEngine: ObservableObject {
             MainActor.assumeIsolated { self?.trackEnded() }
         }
         isLoading = false
+        item.audioTimePitchAlgorithm = .spectral
         if wantsToPlay {
             setActive()
             player.play()
+            if rate != 1 { player.rate = rate }
         }
         updatePlayingState()
         publishNowPlaying()
@@ -286,6 +350,21 @@ final class PlayerEngine: ObservableObject {
 
     private func trackEnded() {
         position = duration
+        if sleepAtEndOfTrack {
+            sleepAtEndOfTrack = false
+            pause()
+            return
+        }
+        if repeatMode == 2 {
+            seek(to: 0)
+            player.play()
+            return
+        }
+        if index + 1 >= queue.count, repeatMode == 1, !queue.isEmpty {
+            index = 0
+            load()
+            return
+        }
         if index + 1 < queue.count {
             index += 1
             load()

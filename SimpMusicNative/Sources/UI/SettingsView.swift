@@ -81,6 +81,8 @@ struct SettingsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
         .navigationTitle("Ajustes")
         .sheet(isPresented: $showLogin) { LoginView() }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
