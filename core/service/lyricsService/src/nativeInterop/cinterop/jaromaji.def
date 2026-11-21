@@ -1,0 +1,75 @@
+package = org.simpmusic.lyrics.native
+headers = CoreFoundation/CoreFoundation.h
+linkerOpts = -framework CoreFoundation
+---
+#include <CoreFoundation/CoreFoundation.h>
+#include <stdlib.h>
+#include <string.h>
+
+/*
+ * Japanese line -> romaji, space-separated per word, using the system tokenizer (ja locale),
+ * whose Latin-transcription attribute carries each word's reading (kanji included). Text the
+ * tokenizer skips (punctuation, spaces) is kept as written. Returns a malloc'd UTF-8 string the
+ * caller frees with free(), or NULL. Written in C because Kotlin/Native's binding of
+ * CFStringTokenizerAdvanceToNextToken throws ClassCastException on its last call.
+ */
+static inline char* simp_japanese_romaji(const char* utf8) {
+    if (utf8 == NULL) return NULL;
+    CFStringRef line = CFStringCreateWithCString(kCFAllocatorDefault, utf8, kCFStringEncodingUTF8);
+    if (line == NULL) return NULL;
+    CFIndex len = CFStringGetLength(line);
+    CFLocaleRef locale = CFLocaleCreate(kCFAllocatorDefault, CFSTR("ja"));
+    CFStringTokenizerRef tok = CFStringTokenizerCreate(kCFAllocatorDefault, line, CFRangeMake(0, len), kCFStringTokenizerUnitWord, locale);
+    CFMutableStringRef out = CFStringCreateMutable(kCFAllocatorDefault, 0);
+    CFIndex cursor = 0;
+    while (CFStringTokenizerAdvanceToNextToken(tok) != kCFStringTokenizerTokenNone) {
+        CFRange r = CFStringTokenizerGetCurrentTokenRange(tok);
+        if (r.location > cursor) {
+            CFStringRef gap = CFStringCreateWithSubstring(kCFAllocatorDefault, line, CFRangeMake(cursor, r.location - cursor));
+            CFMutableStringRef g = CFStringCreateMutableCopy(kCFAllocatorDefault, 0, gap);
+            CFStringTrimWhitespace(g);
+            if (CFStringGetLength(g) > 0) {
+                if (CFStringGetLength(out) > 0) CFStringAppend(out, CFSTR(" "));
+                CFStringAppend(out, g);
+            }
+            CFRelease(g);
+            CFRelease(gap);
+        }
+        CFTypeRef latin = CFStringTokenizerCopyCurrentTokenAttribute(tok, kCFStringTokenizerAttributeLatinTranscription);
+        if (CFStringGetLength(out) > 0) CFStringAppend(out, CFSTR(" "));
+        if (latin != NULL && CFGetTypeID(latin) == CFStringGetTypeID() && CFStringGetLength((CFStringRef)latin) > 0) {
+            CFStringAppend(out, (CFStringRef)latin);
+        } else {
+            CFStringRef surface = CFStringCreateWithSubstring(kCFAllocatorDefault, line, r);
+            CFStringAppend(out, surface);
+            CFRelease(surface);
+        }
+        if (latin != NULL) CFRelease(latin);
+        cursor = r.location + r.length;
+    }
+    if (cursor < len) {
+        CFStringRef rest = CFStringCreateWithSubstring(kCFAllocatorDefault, line, CFRangeMake(cursor, len - cursor));
+        CFMutableStringRef g = CFStringCreateMutableCopy(kCFAllocatorDefault, 0, rest);
+        CFStringTrimWhitespace(g);
+        if (CFStringGetLength(g) > 0) {
+            if (CFStringGetLength(out) > 0) CFStringAppend(out, CFSTR(" "));
+            CFStringAppend(out, g);
+        }
+        CFRelease(g);
+        CFRelease(rest);
+    }
+    char* result = NULL;
+    if (CFStringGetLength(out) > 0) {
+        CFIndex max = CFStringGetMaximumSizeForEncoding(CFStringGetLength(out), kCFStringEncodingUTF8) + 1;
+        result = (char*)malloc((size_t)max);
+        if (result != NULL && !CFStringGetCString(out, result, max, kCFStringEncodingUTF8)) {
+            free(result);
+            result = NULL;
+        }
+    }
+    CFRelease(out);
+    CFRelease(tok);
+    CFRelease(locale);
+    CFRelease(line);
+    return result;
+}
