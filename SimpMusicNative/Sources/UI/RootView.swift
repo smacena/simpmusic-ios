@@ -6,6 +6,8 @@ struct RootView: View {
 
     var body: some View {
         TabView {
+            NavigationStack { HomeView() }
+                .tabItem { Label("Início", systemImage: "house.fill") }
             NavigationStack { SearchView() }
                 .tabItem { Label("Buscar", systemImage: "magnifyingglass") }
             NavigationStack { LibraryView() }

@@ -222,6 +222,101 @@ actor InnerTube {
         return nil
     }
 
+    // MARK: Home and collections
+
+    struct Shelf: Identifiable {
+        let id = UUID()
+        let title: String
+        let items: [ShelfItem]
+    }
+
+    enum ShelfItem: Identifiable {
+        case song(Track)
+        case collection(Collection)
+        var id: String {
+            switch self {
+            case let .song(t): "s" + t.id
+            case let .collection(c): "c" + c.browseId
+            }
+        }
+    }
+
+    struct Collection: Hashable {
+        let browseId: String
+        let title: String
+        let subtitle: String
+        let thumbnail: URL?
+    }
+
+    /// YouTube Music's home feed: carousels of songs, playlists and albums.
+    func home() async throws -> [Shelf] {
+        let json = try await post("browse", client: Self.webRemix, body: ["browseId": "FEmusic_home"])
+        var shelves: [Shelf] = []
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let shelf = dict["musicCarouselShelfRenderer"] as? [String: Any] {
+                    if let parsed = Self.parseShelf(shelf) { shelves.append(parsed) }
+                    return
+                }
+                for value in dict.values { walk(value) }
+            } else if let array = node as? [Any] {
+                for value in array { walk(value) }
+            }
+        }
+        walk(json)
+        return shelves
+    }
+
+    private static func text(_ node: Any?) -> String {
+        ((node as? [String: Any])?["runs"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined() ?? ""
+    }
+
+    private static func parseShelf(_ shelf: [String: Any]) -> Shelf? {
+        let header = (shelf["header"] as? [String: Any])?["musicCarouselShelfBasicHeaderRenderer"] as? [String: Any]
+        let title = text(header?["title"])
+        var items: [ShelfItem] = []
+        for content in shelf["contents"] as? [[String: Any]] ?? [] {
+            if let row = content["musicResponsiveListItemRenderer"] as? [String: Any], let track = parseItem(row) {
+                items.append(.song(track))
+            } else if let two = content["musicTwoRowItemRenderer"] as? [String: Any] {
+                let thumbs = (((two["thumbnailRenderer"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any])?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
+                let thumb = (thumbs?.last?["url"] as? String).flatMap(URL.init(string:))
+                let name = text(two["title"])
+                let subtitle = text(two["subtitle"])
+                let nav = two["navigationEndpoint"] as? [String: Any]
+                if let browse = (nav?["browseEndpoint"] as? [String: Any])?["browseId"] as? String {
+                    items.append(.collection(Collection(browseId: browse, title: name, subtitle: subtitle, thumbnail: thumb)))
+                } else if let watch = nav?["watchEndpoint"] as? [String: Any], let id = watch["videoId"] as? String {
+                    items.append(.song(Track(id: id, title: name, artist: subtitle.components(separatedBy: " • ").first ?? subtitle, thumbnail: thumb, durationText: nil)))
+                }
+            }
+        }
+        return title.isEmpty || items.isEmpty ? nil : Shelf(title: title, items: items)
+    }
+
+    /// The songs of a playlist or album page.
+    func collectionTracks(_ browseId: String) async throws -> [Track] {
+        let json = try await post("browse", client: Self.webRemix, body: ["browseId": browseId])
+        var tracks = Self.parseListItems(json)
+        // Album rows carry no artwork of their own: use the album cover.
+        if tracks.contains(where: { $0.thumbnail == nil }), let cover = Self.firstThumbnail(json) {
+            tracks = tracks.map { $0.thumbnail == nil ? Track(id: $0.id, title: $0.title, artist: $0.artist, thumbnail: cover, durationText: $0.durationText) : $0 }
+        }
+        return tracks
+    }
+
+    private static func firstThumbnail(_ node: Any) -> URL? {
+        if let dict = node as? [String: Any] {
+            if let thumbs = (dict["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]], let url = thumbs.last?["url"] as? String {
+                return URL(string: url)
+            }
+            for value in dict.values { if let u = firstThumbnail(value) { return u } }
+        } else if let array = node as? [Any] {
+            for value in array { if let u = firstThumbnail(value) { return u } }
+        }
+        return nil
+    }
+
     // MARK: Radio (what plays after a song)
 
     /// The radio queue YouTube Music builds from a song ("next" endpoint, RDAMVM playlist).
