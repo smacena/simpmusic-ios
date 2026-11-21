@@ -30,6 +30,16 @@ struct SettingsView: View {
                     }
                 }
             }
+            Section("Reverb") {
+                Toggle("Ativado", isOn: $effects.reverbEnabled)
+                if effects.reverbEnabled {
+                    Picker("Ambiente", selection: $effects.reverbPreset) {
+                        ForEach(ReverbPreset.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    LabeledSlider(title: "Mistura", value: $effects.reverbMix, range: 0 ... 1, unit: "")
+                }
+            }
             Section("Eco (Delay)") {
                 Toggle("Ativado", isOn: $effects.delayEnabled)
                 if effects.delayEnabled {

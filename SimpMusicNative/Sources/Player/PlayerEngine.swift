@@ -50,6 +50,31 @@ final class PlayerEngine: ObservableObject {
             MainActor.assumeIsolated { self?.tick() }
         }
         AudioEffects.shared.applyStored()
+        restoreQueue()
+        sessionObservers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.persistQueue() }
+        })
+    }
+
+    // MARK: Saved queue
+
+    private var lastPersist = Date.distantPast
+
+    /// The queue and position, saved so the next launch resumes where this one stopped (paused).
+    private func persistQueue() {
+        guard !queue.isEmpty else { return }
+        lastPersist = Date()
+        Library.shared.saveQueue(.init(tracks: queue, index: index, position: position))
+    }
+
+    private func restoreQueue() {
+        guard let saved = Library.shared.savedQueue(), saved.tracks.indices.contains(saved.index) else { return }
+        queue = saved.tracks
+        index = saved.index
+        position = saved.position
+        duration = Double(current?.durationText.flatMap(Self.seconds(from:)) ?? 0)
+        publishNowPlaying()
+        if let track = current { loadArtwork(for: track) }
     }
 
     // MARK: Public transport
@@ -135,7 +160,10 @@ final class PlayerEngine: ObservableObject {
             guard let self else { return }
             do {
                 let stream: AudioStream
-                if !forceFresh, let cached = self.prefetched.removeValue(forKey: track.id) {
+                if let local = Downloads.localFile(for: track.id) {
+                    // Offline copy first: no network, no expiring link.
+                    stream = AudioStream(url: local, durationMs: Int(self.duration * 1000), loudnessDb: nil, expiresAt: nil)
+                } else if !forceFresh, let cached = self.prefetched.removeValue(forKey: track.id) {
                     stream = cached
                 } else {
                     stream = try await self.resolveWithRetry(track.id)
@@ -168,6 +196,9 @@ final class PlayerEngine: ObservableObject {
     private func start(_ stream: AudioStream, startAt start: Double) async throws {
         self.stream = stream
         if stream.durationMs > 0 { duration = Double(stream.durationMs) / 1000 }
+        if duration <= 0, stream.url.isFileURL, let d = try? await AVURLAsset(url: stream.url).load(.duration), d.seconds.isFinite {
+            duration = d.seconds
+        }
         let asset = AVURLAsset(url: stream.url)
         // The audio chain goes on BEFORE the item plays: attaching it to a playing item makes
         // AVFoundation stop, rebuild and resume its pipeline — an audible hiccup.
@@ -189,6 +220,8 @@ final class PlayerEngine: ObservableObject {
         updatePlayingState()
         publishNowPlaying()
         prefetchNext()
+        if let track = current { Library.shared.addRecent(track) }
+        persistQueue()
         NSLog("SimpNative: playing \(current?.id ?? "?") dur=\(Int(duration))s")
     }
 
@@ -249,6 +282,7 @@ final class PlayerEngine: ObservableObject {
         let seconds = player.currentTime().seconds
         if seconds.isFinite { position = seconds }
         updatePlayingState()
+        if isPlaying, Date().timeIntervalSince(lastPersist) > 10 { persistQueue() }
         // With the inflated length AVPlayer may keep "playing" past the real end, or wait for
         // bytes that don't exist just before it: either way, that is the end of the track.
         if duration > 0, position >= duration + 1.5 { trackEnded(); return }

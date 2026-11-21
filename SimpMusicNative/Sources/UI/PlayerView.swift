@@ -5,6 +5,9 @@ struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var scrubbing: Double?
     @State private var showQueue = false
+    @State private var showLyrics = false
+    @ObservedObject private var library = Library.shared
+    @ObservedObject private var downloads = Downloads.shared
 
     var body: some View {
         VStack(spacing: 22) {
@@ -46,14 +49,27 @@ struct PlayerView: View {
                 Button { player.next() } label: { Image(systemName: "forward.fill").font(.title) }
             }
             .foregroundStyle(.primary)
-            HStack {
+            HStack(spacing: 28) {
+                if let track = player.current {
+                    Button { library.toggleFavorite(track) } label: {
+                        Image(systemName: library.isFavorite(track) ? "heart.fill" : "heart").font(.title3)
+                    }
+                    Button { downloads.download(track) } label: {
+                        if downloads.inProgress.contains(track.id) { ProgressView() } else {
+                            Image(systemName: Downloads.localFile(for: track.id) != nil ? "arrow.down.circle.fill" : "arrow.down.circle").font(.title3)
+                        }
+                    }
+                    .disabled(Downloads.localFile(for: track.id) != nil)
+                }
                 Spacer()
-                Button { showQueue = true } label: { Label("Fila", systemImage: "list.bullet") }
+                Button { showLyrics = true } label: { Image(systemName: "quote.bubble").font(.title3) }
+                Button { showQueue = true } label: { Image(systemName: "list.bullet").font(.title3) }
             }
             .padding(.horizontal, 24)
             Spacer(minLength: 0)
         }
         .sheet(isPresented: $showQueue) { QueueView() }
+        .sheet(isPresented: $showLyrics) { LyricsView() }
     }
 
     static func format(_ seconds: Double) -> String {

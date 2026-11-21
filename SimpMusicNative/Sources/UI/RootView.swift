@@ -8,6 +8,8 @@ struct RootView: View {
         TabView {
             NavigationStack { SearchView() }
                 .tabItem { Label("Buscar", systemImage: "magnifyingglass") }
+            NavigationStack { LibraryView() }
+                .tabItem { Label("Biblioteca", systemImage: "music.note.list") }
             NavigationStack { SettingsView() }
                 .tabItem { Label("Ajustes", systemImage: "slider.horizontal.3") }
         }

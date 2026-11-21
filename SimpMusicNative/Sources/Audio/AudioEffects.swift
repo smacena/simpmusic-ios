@@ -26,6 +26,9 @@ final class AudioEffects: ObservableObject {
     @Published var delayTimeMs: Double { didSet { save(); applyDelay() } }
     @Published var delayFeedback: Double { didSet { save(); applyDelay() } }
     @Published var delayMix: Double { didSet { save(); applyDelay() } }
+    @Published var reverbEnabled: Bool { didSet { save(); applyReverb() } }
+    @Published var reverbPreset: ReverbPreset { didSet { save(); applyReverb() } }
+    @Published var reverbMix: Double { didSet { save(); applyReverb() } }
 
     private let defaults = UserDefaults.standard
 
@@ -37,11 +40,15 @@ final class AudioEffects: ObservableObject {
         delayTimeMs = defaults.object(forKey: "delay.time") as? Double ?? 300
         delayFeedback = defaults.object(forKey: "delay.feedback") as? Double ?? 0.35
         delayMix = defaults.object(forKey: "delay.mix") as? Double ?? 0.3
+        reverbEnabled = defaults.bool(forKey: "reverb.enabled")
+        reverbPreset = ReverbPreset(rawValue: defaults.string(forKey: "reverb.preset") ?? "") ?? .hall
+        reverbMix = defaults.object(forKey: "reverb.mix") as? Double ?? 0.35
     }
 
     func applyStored() {
         applyEqualizer()
         applyDelay()
+        applyReverb()
     }
 
     private func save() {
@@ -52,6 +59,32 @@ final class AudioEffects: ObservableObject {
         defaults.set(delayTimeMs, forKey: "delay.time")
         defaults.set(delayFeedback, forKey: "delay.feedback")
         defaults.set(delayMix, forKey: "delay.mix")
+        defaults.set(reverbEnabled, forKey: "reverb.enabled")
+        defaults.set(reverbPreset.rawValue, forKey: "reverb.preset")
+        defaults.set(reverbMix, forKey: "reverb.mix")
+    }
+
+    private var reverbGeneration = 0
+
+    /// The impulse response and its spectra take tens of milliseconds: built off the main thread,
+    /// and the reverb already playing keeps playing until the new one is swapped in.
+    private func applyReverb() {
+        reverbGeneration += 1
+        guard reverbEnabled else {
+            simp_reverb_set(nil, nil, 0, 0)
+            return
+        }
+        let generation = reverbGeneration
+        let preset = reverbPreset
+        let mix = Float(min(max(reverbMix, 0), 1))
+        let rate = Int(simp_sample_rate())
+        Task.detached(priority: .utility) {
+            let ir = ReverbImpulse.generate(preset, sampleRate: rate)
+            let current = await MainActor.run { AudioEffects.shared.reverbGeneration }
+            guard current == generation else { return }
+            var left = ir.left, right = ir.right
+            _ = simp_reverb_set(&left, &right, Int32(min(left.count, right.count)), mix)
+        }
     }
 
     private func applyEqualizer() {
