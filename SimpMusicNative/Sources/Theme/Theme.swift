@@ -55,7 +55,7 @@ final class ArtworkColor: ObservableObject {
         guard let url, url != loadedFor else { return }
         loadedFor = url
         Task {
-            guard let (data, _) = try? await URLSession.shared.data(from: url), let image = CIImage(data: data) else { return }
+            guard let (data, _) = try? await Net.session.data(from: url), let image = CIImage(data: data) else { return }
             let filter = CIFilter(name: "CIAreaAverage", parameters: [kCIInputImageKey: image, kCIInputExtentKey: CIVector(cgRect: image.extent)])
             guard let output = filter?.outputImage else { return }
             var px = [UInt8](repeating: 0, count: 4)

@@ -89,7 +89,7 @@ actor InnerTube {
     private let gl: String
 
     init() {
-        let config = URLSessionConfiguration.default
+        let config = Net.makeConfiguration() // carries Settings → Proxy
         config.timeoutIntervalForRequest = 20
         config.waitsForConnectivity = false
         session = URLSession(configuration: config)

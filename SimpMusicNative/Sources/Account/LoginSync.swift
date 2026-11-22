@@ -216,7 +216,7 @@ enum LoginSyncSender {
         req.httpMethod = "POST"
         req.timeoutInterval = kind == "hello" ? 4 : 20
         req.httpBody = try LoginSyncWire.seal(plain, key: key, kind: kind, reply: false)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await Net.session.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status == 403 || status == 410 { throw Failure(message: "o código expirou; gere outro no computador") }
         guard status == 200, let plainReply = LoginSyncWire.open(data, key: key, kind: kind, reply: true) else { throw Failure(message: "o computador respondeu \(status)") }

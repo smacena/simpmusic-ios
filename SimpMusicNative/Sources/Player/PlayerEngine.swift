@@ -787,7 +787,7 @@ final class PlayerEngine: ObservableObject {
         artworkTask?.cancel()
         guard let url = track.artworkLarge else { return }
         artworkTask = Task { [weak self] in
-            guard let (data, _) = try? await URLSession.shared.data(from: url), let image = UIImage(data: data) else { return }
+            guard let (data, _) = try? await Net.session.data(from: url), let image = UIImage(data: data) else { return }
             guard let self, self.current?.id == track.id else { return }
             self.nowPlaying[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
             self.publishNowPlaying()

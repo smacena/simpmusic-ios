@@ -57,7 +57,7 @@ enum Lyrics {
         var req = URLRequest(url: url)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("SimpMusicLyrics/1.0", forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await URLSession.shared.data(for: req),
+        guard let (data, response) = try? await Net.session.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) else { return nil }
         let list: [[String: Any]] = (json as? [[String: Any]]) ?? ((json as? [String: Any]).map { ($0["data"] as? [[String: Any]]) ?? [$0] } ?? [])
@@ -80,7 +80,7 @@ enum Lyrics {
         var req = URLRequest(url: url)
         req.timeoutInterval = 10
         req.setValue("SimpMusicLyrics/1.0", forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await URLSession.shared.data(for: req),
+        guard let (data, response) = try? await Net.session.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let ttml = json["ttml"] as? String, !ttml.isEmpty else { return nil }
@@ -155,7 +155,7 @@ enum Lyrics {
         guard let url = comps.url else { return nil }
         var req = URLRequest(url: url)
         req.setValue("SimpMusic-iOS-personal", forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await URLSession.shared.data(for: req),
+        guard let (data, response) = try? await Net.session.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return try? JSONSerialization.jsonObject(with: data)
     }
@@ -167,7 +167,7 @@ enum Lyrics {
         var req = URLRequest(url: url)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("SimpMusicLyrics/1.0", forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await URLSession.shared.data(for: req),
+        guard let (data, response) = try? await Net.session.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) else { return nil }
         let object = (json as? [String: Any]) ?? ((json as? [[String: Any]])?.max { ($0["vote"] as? Int ?? 0) < ($1["vote"] as? Int ?? 0) })

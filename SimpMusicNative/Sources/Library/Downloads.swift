@@ -30,7 +30,7 @@ final class Downloads: ObservableObject {
         while total == nil || start < total! {
             var request = URLRequest(url: url)
             request.setValue("bytes=\(start)-\(start + chunk - 1)", forHTTPHeaderField: "Range")
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await Net.session.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw InnerTubeError.badResponse }
             if http.statusCode == 416 { break }
             guard http.statusCode == 206 || http.statusCode == 200 else { throw InnerTubeError.http(http.statusCode) }

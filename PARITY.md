@@ -61,7 +61,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Conteúdo explícito | [x] | [x] |
 | Playlists do YouTube offline | [x] | [ ] |
 | Juntar curtidas locais e do YouTube | [x] | [ ] |
-| Proxy (tipo, host, porta, usuário, senha) | [x] | [ ] |
+| Proxy (tipo, host, porta, usuário, senha) | [x] | [x] (streaming de áudio usa a rede do sistema) |
 | Normalizar volume / pular silêncio | [x] | [x] |
 | Equalizador do sistema | [—] iOS não oferece | [—] |
 | Equalizador 10 bandas + AutoEq | [x] | [x] |

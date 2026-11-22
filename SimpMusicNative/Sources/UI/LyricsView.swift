@@ -127,7 +127,7 @@ struct ShareLyricsButton: View {
         let line = index.flatMap { lyrics.lines?[$0].text } ?? lyrics.lines?.first?.text ?? ""
         Task {
             var cover: UIImage?
-            if let url = track.artworkLarge, let (data, _) = try? await URLSession.shared.data(from: url) { cover = UIImage(data: data) }
+            if let url = track.artworkLarge, let (data, _) = try? await Net.session.data(from: url) { cover = UIImage(data: data) }
             let card = VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     if let cover { Image(uiImage: cover).resizable().frame(width: 64, height: 64).clipShape(RoundedRectangle(cornerRadius: 8)) }

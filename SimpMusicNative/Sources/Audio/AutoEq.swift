@@ -24,7 +24,7 @@ enum AutoEq {
             text = try? String(contentsOf: cacheFile, encoding: .utf8)
         }
         if text == nil {
-            let (data, _) = try await URLSession.shared.data(from: URL(string: "\(base)/INDEX.md")!)
+            let (data, _) = try await Net.session.data(from: URL(string: "\(base)/INDEX.md")!)
             try? data.write(to: cacheFile, options: .atomic)
             text = String(data: data, encoding: .utf8)
         }
@@ -39,7 +39,7 @@ enum AutoEq {
     /// The ten gains (dB) and preamp of a profile.
     static func curve(_ entry: Entry) async throws -> (gains: [Double], preamp: Double) {
         let folder = entry.path.split(separator: "/").last.map(String.init) ?? entry.path
-        let (data, _) = try await URLSession.shared.data(from: URL(string: "\(base)/\(entry.path)/\(folder)%20FixedBandEQ.txt")!)
+        let (data, _) = try await Net.session.data(from: URL(string: "\(base)/\(entry.path)/\(folder)%20FixedBandEQ.txt")!)
         let text = String(data: data, encoding: .utf8) ?? ""
         var preamp = 0.0
         let centres: [Double] = [31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]

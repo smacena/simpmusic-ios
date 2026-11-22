@@ -26,7 +26,7 @@ enum SponsorBlock {
             URLQueryItem(name: "videoID", value: videoId),
             URLQueryItem(name: "categories", value: "[" + categories.map { "\"\($0)\"" }.joined(separator: ",") + "]"),
         ]
-        guard let url = comps.url, let (data, response) = try? await URLSession.shared.data(from: url),
+        guard let url = comps.url, let (data, response) = try? await Net.session.data(from: url),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
         return list.compactMap { item in

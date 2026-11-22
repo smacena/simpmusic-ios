@@ -9,6 +9,12 @@ struct SettingsView: View {
     @State private var sponsorBlock = SponsorBlock.enabled
     @AppStorage("download.liked") private var downloadLiked = false
     @AppStorage("smart.enabled") private var smartDownloads = false
+    @AppStorage("proxy.enabled") private var proxyOn = false
+    @AppStorage("proxy.type") private var proxyType = "http"
+    @AppStorage("proxy.host") private var proxyHost = ""
+    @AppStorage("proxy.port") private var proxyPort = 8080
+    @AppStorage("proxy.user") private var proxyUser = ""
+    @AppStorage("proxy.pass") private var proxyPass = ""
     @AppStorage("smart.count") private var smartCount = 20
     @AppStorage("eightd.enabled") private var eightD = false
     @AppStorage("content.country") private var contentCountry = ""
@@ -109,6 +115,19 @@ struct SettingsView: View {
                     .confirmationDialog("Apagar todo o histórico de escuta?", isPresented: $confirmClearHistory, titleVisibility: .visible) {
                         Button("Apagar", role: .destructive) { Library.shared.clearHistory() }
                     }
+            }
+            Section("Proxy") {
+                Toggle("Usar proxy", isOn: $proxyOn).onChange(of: proxyOn) { _, _ in Net.reset() }
+                if proxyOn {
+                    Picker("Tipo", selection: $proxyType) { Text("HTTP").tag("http"); Text("SOCKS5").tag("socks") }
+                    TextField("Servidor", text: $proxyHost).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("Porta", value: $proxyPort, format: .number.grouping(.never)).keyboardType(.numberPad)
+                    TextField("Usuário (opcional)", text: $proxyUser).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField("Senha (opcional)", text: $proxyPass)
+                    Button("Aplicar") { Net.reset() }
+                    Text("Vale para dados, letras, downloads e capas. O som em streaming usa a rede do sistema; reabra o app para tudo passar pelo proxy.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Section("Qualidade") {
                 Picker("Áudio", selection: $audioQuality) {
