@@ -8,6 +8,9 @@ struct SettingsView: View {
     @State private var skipSilence = PlayerEngine.shared.skipSilence
     @State private var sponsorBlock = SponsorBlock.enabled
     @AppStorage("download.liked") private var downloadLiked = false
+    @AppStorage("eightd.enabled") private var eightD = false
+    @AppStorage("eightd.direction") private var eightDDirection = 1.0
+    @AppStorage("eightd.period") private var eightDPeriod = 10.0
     @State private var crossfadeSeconds = PlayerEngine.shared.crossfadeSeconds
     @ObservedObject private var account = Account.shared
     @State private var showLogin = false
@@ -124,6 +127,19 @@ struct SettingsView: View {
                             Text("\(Int(effects.gains[band]))").font(.caption.monospacedDigit()).frame(width: 28)
                         }
                     }
+                }
+            }
+            Section("Áudio 8D") {
+                Toggle("Ativado", isOn: $eightD).onChange(of: eightD) { _, _ in PlayerEngine.applyEightD() }
+                if eightD {
+                    Picker("Direção", selection: $eightDDirection) {
+                        Text("Esquerda → direita").tag(1.0)
+                        Text("Direita → esquerda").tag(-1.0)
+                    }
+                    .onChange(of: eightDDirection) { _, _ in PlayerEngine.applyEightD() }
+                    Stepper("Uma volta a cada \(eightDPeriod, specifier: "%.1f") s", value: $eightDPeriod, in: 3 ... 30, step: 0.5)
+                        .onChange(of: eightDPeriod) { _, _ in PlayerEngine.applyEightD() }
+                    Text("Melhor com fones de ouvido.").font(.caption).foregroundStyle(.secondary)
                 }
             }
             Section("Reverb") {

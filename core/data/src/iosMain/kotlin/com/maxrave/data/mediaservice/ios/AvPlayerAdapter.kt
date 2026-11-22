@@ -78,6 +78,7 @@ import platform.Foundation.NSURL
 import platform.darwin.NSObjectProtocol
 import kotlin.math.pow
 import kotlin.random.Random
+import com.maxrave.data.native.dsp.simp_8d_set
 import com.maxrave.data.native.dsp.simp_dj_set
 import com.maxrave.data.native.dsp.simp_level
 import com.maxrave.data.native.dsp.simp_normalize_set
@@ -876,6 +877,14 @@ class AvPlayerAdapter(
                 if (db == null) 1f else 10f.pow(-db / 20f).coerceIn(0.25f, 2f)
             }
         simp_normalize_set(gain)
+    }
+
+    // 8D audio in C (simp_8d_*): the same head model as Android's EightDKernel.
+    private val eightDAvailableFlow = kotlinx.coroutines.flow.MutableStateFlow(true)
+    override val eightDAvailable: kotlinx.coroutines.flow.StateFlow<Boolean> get() = eightDAvailableFlow
+
+    override fun setEightD(effect: com.maxrave.domain.data.player.EightDEffect?) {
+        if (effect == null) simp_8d_set(0, 0.0) else simp_8d_set(1, effect.normalized().radiansPerSecond)
     }
 
     override fun setAudioEffects(effects: AudioEffects) {

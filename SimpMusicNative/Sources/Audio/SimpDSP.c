@@ -422,6 +422,77 @@ static void simp_dj_process(int slot, int ch, float* data, int frames, int type)
     }
 }
 
+/* ---------------------------------------------------------------- 8D audio */
+
+/* SimpMusic's 8D (EightDKernel.kt / EightDHead): the song circles the head; each ear hears its own
+ * channel after its own interaural delay (Catmull-Rom fractional read) and through Brown & Duda's
+ * head-shadow filter (bilinear one-pole/one-zero). The phase is shared by both channels: channel 0
+ * records where the buffer started, channel 1 replays from there. 50 ms fades on switch. */
+#define SIMP_8D_HIST 128
+static uint32_t g_8d_on;
+static uint64_t g_8d_rps_bits; /* radians per second (double bits) */
+static double g_8d_phase[SIMP_SLOTS], g_8d_start[SIMP_SLOTS];
+static double g_8d_wet[SIMP_SLOTS], g_8d_wet_start[SIMP_SLOTS];
+static double g_8d_hist[SIMP_SLOTS][SIMP_CH][SIMP_8D_HIST];
+static int g_8d_w[SIMP_SLOTS][SIMP_CH];
+static double g_8d_x1[SIMP_SLOTS][SIMP_CH], g_8d_y1[SIMP_SLOTS][SIMP_CH];
+
+void simp_8d_set(int enabled, double radiansPerSecond) {
+    uint64_t b; memcpy(&b, &radiansPerSecond, 8);
+    __atomic_store_n(&g_8d_rps_bits, b, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_8d_on, (uint32_t)(enabled != 0), __ATOMIC_RELEASE);
+}
+
+static double simp_8d_alpha(double theta) {
+    const double amin = 0.1, tmin = 150.0 * M_PI / 180.0;
+    return (1 + amin / 2) + (1 - amin / 2) * cos(theta / tmin * M_PI);
+}
+
+static void simp_8d_process(int slot, int ch, float* data, int frames, int on) {
+    double rate = g_rate > 0 ? g_rate : 44100.0;
+    uint64_t b = __atomic_load_n(&g_8d_rps_bits, __ATOMIC_ACQUIRE);
+    double rps; memcpy(&rps, &b, 8);
+    double step = rps / rate, wetStep = 1000.0 / (rate * 50.0), target = on ? 1.0 : 0.0;
+    if (ch == 0) { g_8d_start[slot] = g_8d_phase[slot]; g_8d_wet_start[slot] = g_8d_wet[slot]; }
+    double phase = g_8d_start[slot], wet = g_8d_wet_start[slot];
+    if (wet == 0.0 && target == 0.0) return;
+    const double r = 0.0875 / 343.0, beta = 2 * 343.0 / 0.0875, k = 2.0 * rate;
+    double axis = ch == 0 ? -M_PI / 2 : M_PI / 2;
+    double* hist = g_8d_hist[slot][ch];
+    int w = g_8d_w[slot][ch];
+    double x1 = g_8d_x1[slot][ch], y1 = g_8d_y1[slot][ch];
+    for (int i = 0; i < frames; i++) {
+        double x = data[i];
+        hist[w] = x;
+        /* Incidence for this ear; the pole comes from the LEFT ear, as in the Kotlin kernel. */
+        double u = phase - axis + M_PI;
+        double theta = fabs(u - 2 * M_PI * floor(u / (2 * M_PI)) - M_PI);
+        double ul = phase + M_PI / 2 + M_PI;
+        double thetaL = fabs(ul - 2 * M_PI * floor(ul / (2 * M_PI)) - M_PI);
+        double bright = fmax(simp_8d_alpha(theta), simp_8d_alpha(M_PI - theta));
+        double gain = simp_8d_alpha(theta) / bright;
+        double pole = beta / fmax(simp_8d_alpha(thetaL), simp_8d_alpha(M_PI - thetaL));
+        double delay = (theta < M_PI / 2 ? -r * cos(theta) : r * (theta - M_PI / 2)) + r;
+        double pos = delay * rate + 1;
+        int whole = (int)floor(pos);
+        double t = pos - whole;
+        int m = SIMP_8D_HIST - 1;
+        double p0 = hist[(w - whole + 1) & m], p1 = hist[(w - whole) & m], p2 = hist[(w - whole - 1) & m], p3 = hist[(w - whole - 2) & m];
+        double c1 = 0.5 * (p2 - p0), c2 = p0 - 2.5 * p1 + 2 * p2 - 0.5 * p3, c3 = 0.5 * (p3 - p0) + 1.5 * (p1 - p2);
+        double delayed = ((c3 * t + c2) * t + c1) * t + p1;
+        double norm = 1 / (pole + k);
+        double y = ((pole + gain * k) * delayed + (pole - gain * k) * x1 - (pole - k) * y1) * norm;
+        x1 = delayed; y1 = y;
+        w = (w + 1) & m;
+        data[i] = (float)(x * (1 - wet) + y * wet);
+        phase += step;
+        if (phase > M_PI) phase -= 2 * M_PI; else if (phase < -M_PI) phase += 2 * M_PI;
+        wet = target > wet ? fmin(target, wet + wetStep) : fmax(target, wet - wetStep);
+    }
+    g_8d_w[slot][ch] = w; g_8d_x1[slot][ch] = x1; g_8d_y1[slot][ch] = y1;
+    g_8d_phase[slot] = phase; g_8d_wet[slot] = wet;
+}
+
 /* Runs the whole chain over one channel of float samples, in place. Exposed for tests too. */
 void simp_process_channel(int slot, int ch, float* data, int frames) {
     if (slot < 0 || slot >= SIMP_SLOTS || ch < 0 || ch >= SIMP_CH || data == NULL) return;
@@ -436,7 +507,9 @@ void simp_process_channel(int slot, int ch, float* data, int frames) {
     }
     float ratio = simp_pitch_ratio();
     int djType = __atomic_load_n(&g_dj_type[slot], __ATOMIC_ACQUIRE);
-    if (!eqOn && echo == NULL && rev == NULL && norm == 1.0f && ratio == 1.0f && djType == 0) return;
+    int eightOn = (int)__atomic_load_n(&g_8d_on, __ATOMIC_ACQUIRE);
+    int eightActive = eightOn || g_8d_wet[slot] > 0.0;
+    if (!eqOn && echo == NULL && rev == NULL && norm == 1.0f && ratio == 1.0f && djType == 0 && !eightActive) return;
     if (ratio != 1.0f) simp_pitch_process(slot, ch, data, frames, ratio);
 
     float pre = (eqOn ? eq->preamp : 1.0f) * norm;
@@ -457,6 +530,7 @@ void simp_process_channel(int slot, int ch, float* data, int frames) {
     }
     if (echo != NULL) simp_echo_process(echo, slot, ch, data, frames);
     if (rev != NULL) simp_reverb_process(rev, slot, ch, data, frames);
+    if (eightActive) simp_8d_process(slot, ch, data, frames, eightOn);
     if (djType != 0) simp_dj_process(slot, ch, data, frames, djType);
     simp_limit(data, frames);
 }

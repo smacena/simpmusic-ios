@@ -72,6 +72,14 @@ final class PlayerEngine: ObservableObject {
     /// Pitch in semitones, independent of speed (C shifter in the tap).
     @Published private(set) var pitchSemitones: Int = UserDefaults.standard.integer(forKey: "pitch.semitones")
 
+    /// 8D audio (C, SimpMusic's head model): on/off, direction (+1 left→right, -1), seconds per turn 3…30.
+    static func applyEightD() {
+        let d = UserDefaults.standard
+        let period = min(30, max(3, d.object(forKey: "eightd.period") as? Double ?? 10))
+        let direction = d.object(forKey: "eightd.direction") as? Double ?? 1
+        simp_8d_set(d.bool(forKey: "eightd.enabled") ? 1 : 0, direction * 2 * .pi / period)
+    }
+
     func setPitch(_ semitones: Int) {
         pitchSemitones = max(-12, min(12, semitones))
         UserDefaults.standard.set(pitchSemitones, forKey: "pitch.semitones")
@@ -93,6 +101,7 @@ final class PlayerEngine: ObservableObject {
         attachClock()
         AudioEffects.shared.applyStored()
         if pitchSemitones != 0 { simp_pitch_set(Float(pow(2.0, Double(pitchSemitones) / 12))) }
+        Self.applyEightD()
         restoreQueue()
         sessionObservers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
