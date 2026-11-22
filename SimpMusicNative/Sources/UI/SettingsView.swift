@@ -5,6 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject private var player: PlayerEngine
     @State private var normalize = PlayerEngine.shared.normalizeVolume
     @State private var crossfade = PlayerEngine.shared.crossfadeEnabled
+    @State private var skipSilence = PlayerEngine.shared.skipSilence
     @State private var crossfadeSeconds = PlayerEngine.shared.crossfadeSeconds
     @ObservedObject private var account = Account.shared
     @State private var showLogin = false
@@ -15,6 +16,8 @@ struct SettingsView: View {
     @State private var translate = LyricsStore.translateEnabled
     @State private var lyricsSource = LyricsSource.preferred
     @AppStorage("lyrics.style") private var lyricsStyle = "classic"
+    @AppStorage("quality.audio") private var audioQuality = "high"
+    @AppStorage("quality.video") private var videoQuality = 720
     @AppStorage("lyrics.offsetMs") private var lyricsOffset = 0
 
     var body: some View {
@@ -38,9 +41,20 @@ struct SettingsView: View {
                 }
                 Button("Restaurar backup") { importing = true }
             }
+            Section("Qualidade") {
+                Picker("Áudio", selection: $audioQuality) {
+                    Text("Alta (AAC 128 kbps)").tag("high")
+                    Text("Economia (AAC 48 kbps)").tag("low")
+                }
+                Picker("Vídeo", selection: $videoQuality) {
+                    ForEach([360, 480, 720, 1080], id: \.self) { Text("\($0)p").tag($0) }
+                }
+            }
             Section("Áudio") {
                 Toggle("Normalizar volume", isOn: $normalize)
                     .onChange(of: normalize) { _, value in player.normalizeVolume = value }
+                Toggle("Pular silêncio", isOn: $skipSilence)
+                    .onChange(of: skipSilence) { _, value in player.skipSilence = value }
                 Toggle("Crossfade", isOn: $crossfade)
                     .onChange(of: crossfade) { _, value in player.crossfadeEnabled = value }
                 if crossfade {

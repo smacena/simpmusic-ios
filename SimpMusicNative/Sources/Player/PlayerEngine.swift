@@ -61,6 +61,21 @@ final class PlayerEngine: ObservableObject {
     private var artworkTask: Task<Void, Never>?
     private var nowPlaying: [String: Any] = [:]
 
+    /// Skips silent stretches: mid-song gaps are jumped over, a silent tail ends the song early.
+    var skipSilence: Bool = UserDefaults.standard.bool(forKey: "skipSilence") {
+        didSet { UserDefaults.standard.set(skipSilence, forKey: "skipSilence") }
+    }
+    private var silentTicks = 0
+
+    /// Pitch in semitones, independent of speed (C shifter in the tap).
+    @Published private(set) var pitchSemitones: Int = UserDefaults.standard.integer(forKey: "pitch.semitones")
+
+    func setPitch(_ semitones: Int) {
+        pitchSemitones = max(-12, min(12, semitones))
+        UserDefaults.standard.set(pitchSemitones, forKey: "pitch.semitones")
+        simp_pitch_set(Float(pow(2.0, Double(pitchSemitones) / 12)))
+    }
+
     var normalizeVolume: Bool = UserDefaults.standard.bool(forKey: "normalizeVolume") {
         didSet {
             UserDefaults.standard.set(normalizeVolume, forKey: "normalizeVolume")
@@ -75,6 +90,7 @@ final class PlayerEngine: ObservableObject {
         setUpRemoteCommands()
         attachClock()
         AudioEffects.shared.applyStored()
+        if pitchSemitones != 0 { simp_pitch_set(Float(pow(2.0, Double(pitchSemitones) / 12))) }
         restoreQueue()
         sessionObservers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -598,6 +614,7 @@ final class PlayerEngine: ObservableObject {
         // bytes that don't exist just before it: either way, that is the end of the track.
         if duration > 0, position >= duration + 1.5 { trackEnded(); return }
         maybeStartCrossfade()
+        checkSilence()
         let waiting = wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate && !isLoading
         if !waiting { stalledSince = nil; return }
         let since = stalledSince ?? Date()
@@ -609,6 +626,17 @@ final class PlayerEngine: ObservableObject {
             lastStallReload = Date()
             stalledSince = nil
             load(startAt: position, forceFresh: true)
+        }
+    }
+
+    /// Four ticks a second. About -50 dBFS counts as silence; never in the first 3 seconds.
+    private func checkSilence() {
+        guard skipSilence, isPlaying, !isLoading, crossfadeTask == nil, position > 3, duration > 10 else { silentTicks = 0; return }
+        if simp_level() < 0.003 { silentTicks += 1 } else { silentTicks = 0; return }
+        if duration - position < 25, silentTicks >= 4 { silentTicks = 0; trackEnded(); return }
+        if silentTicks >= 3 {
+            silentTicks = 0
+            seek(to: min(position + 1.5, duration - 1))
         }
     }
 

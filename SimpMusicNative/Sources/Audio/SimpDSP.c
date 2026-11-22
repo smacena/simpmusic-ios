@@ -324,6 +324,58 @@ static void simp_limit(float* data, int frames) {
     }
 }
 
+/* ---------------------------------------------------------------- level meter + pitch shifter */
+
+/* Peak of the most recent input buffer (float bits; C atomics take no floats). Read by the
+ * player to skip silence. */
+static uint32_t g_peak_bits;
+float simp_level(void) { uint32_t b = __atomic_load_n(&g_peak_bits, __ATOMIC_RELAXED); float f; memcpy(&f, &b, 4); return f; }
+
+/* Pitch without changing speed: a two-head delay-line shifter. Each head reads the recent input
+ * at [ratio] speed; when one wraps around the window the other is at full volume, and a sine
+ * crossfade hides the jump. ~46 ms window: clean for voice and music within ±6 semitones. */
+#define SIMP_PS_N 4096
+#define SIMP_PS_WIN 2048.0f
+static uint32_t g_pitch_bits = 0x3f800000; /* 1.0f */
+static float g_ps_buf[SIMP_SLOTS][SIMP_CH][SIMP_PS_N];
+static int g_ps_w[SIMP_SLOTS][SIMP_CH];
+static float g_ps_phase[SIMP_SLOTS][SIMP_CH];
+
+void simp_pitch_set(float ratio) {
+    if (!(ratio > 0.25f && ratio < 4.0f)) ratio = 1.0f;
+    uint32_t b; memcpy(&b, &ratio, 4);
+    __atomic_store_n(&g_pitch_bits, b, __ATOMIC_RELEASE);
+}
+
+static float simp_pitch_ratio(void) { uint32_t b = __atomic_load_n(&g_pitch_bits, __ATOMIC_ACQUIRE); float f; memcpy(&f, &b, 4); return f; }
+
+static float simp_ps_read(const float* buf, float pos) {
+    while (pos < 0) pos += SIMP_PS_N;
+    int i = (int)pos; float frac = pos - i;
+    float a = buf[i % SIMP_PS_N], c = buf[(i + 1) % SIMP_PS_N];
+    return a + (c - a) * frac;
+}
+
+static void simp_pitch_process(int slot, int ch, float* data, int frames, float ratio) {
+    float* buf = g_ps_buf[slot][ch];
+    int w = g_ps_w[slot][ch];
+    float phase = g_ps_phase[slot][ch];
+    const float step = 1.0f - ratio; /* how fast the read heads drift away from the write head */
+    for (int i = 0; i < frames; i++) {
+        buf[w] = data[i];
+        float d1 = phase, d2 = fmodf(phase + SIMP_PS_WIN * 0.5f, SIMP_PS_WIN);
+        float g1 = sinf((float)M_PI * d1 / SIMP_PS_WIN), g2 = sinf((float)M_PI * d2 / SIMP_PS_WIN);
+        float y = simp_ps_read(buf, (float)w - d1 - 1) * g1 * g1 + simp_ps_read(buf, (float)w - d2 - 1) * g2 * g2;
+        data[i] = y;
+        phase += step;
+        if (phase >= SIMP_PS_WIN) phase -= SIMP_PS_WIN;
+        if (phase < 0) phase += SIMP_PS_WIN;
+        w = (w + 1) % SIMP_PS_N;
+    }
+    g_ps_w[slot][ch] = w;
+    g_ps_phase[slot][ch] = phase;
+}
+
 /* Runs the whole chain over one channel of float samples, in place. Exposed for tests too. */
 void simp_process_channel(int slot, int ch, float* data, int frames) {
     if (slot < 0 || slot >= SIMP_SLOTS || ch < 0 || ch >= SIMP_CH || data == NULL) return;
@@ -332,7 +384,13 @@ void simp_process_channel(int slot, int ch, float* data, int frames) {
     SimpReverb* rev = __atomic_load_n(&g_reverb, __ATOMIC_ACQUIRE);
     float norm = simp_norm_gain();
     int eqOn = eq != NULL && eq->active;
-    if (!eqOn && echo == NULL && rev == NULL && norm == 1.0f) return;
+    if (ch == 0 && slot == 0) {
+        float peak = 0; vDSP_maxmgv(data, 1, &peak, (vDSP_Length)frames);
+        uint32_t b; memcpy(&b, &peak, 4); __atomic_store_n(&g_peak_bits, b, __ATOMIC_RELAXED);
+    }
+    float ratio = simp_pitch_ratio();
+    if (!eqOn && echo == NULL && rev == NULL && norm == 1.0f && ratio == 1.0f) return;
+    if (ratio != 1.0f) simp_pitch_process(slot, ch, data, frames, ratio);
 
     float pre = (eqOn ? eq->preamp : 1.0f) * norm;
     if (pre != 1.0f) vDSP_vsmul(data, 1, &pre, data, 1, (vDSP_Length)frames);

@@ -254,8 +254,30 @@ actor InnerTube {
     }
 
     /// YouTube Music's home feed: carousels of songs, playlists and albums.
-    func home() async throws -> [Shelf] {
-        let json = try await post("browse", client: Self.webRemix, body: ["browseId": "FEmusic_home"])
+    func home() async throws -> [Shelf] { try await shelves(browseId: "FEmusic_home") }
+
+    /// Top songs / videos / artists by country (YouTube Music's Charts page).
+    func charts() async throws -> [Shelf] { try await shelves(browseId: "FEmusic_charts") }
+
+    /// Autocomplete for the search box.
+    func searchSuggestions(_ input: String) async -> [String] {
+        guard let json = try? await post("music/get_search_suggestions", client: Self.webRemix, body: ["input": input]) else { return [] }
+        var out: [String] = []
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let r = dict["searchSuggestionRenderer"] as? [String: Any],
+                   let runs = (r["suggestion"] as? [String: Any])?["runs"] as? [[String: Any]] {
+                    out.append(runs.compactMap { $0["text"] as? String }.joined()); return
+                }
+                for v in dict.values { walk(v) }
+            } else if let a = node as? [Any] { for v in a { walk(v) } }
+        }
+        walk(json)
+        return out
+    }
+
+    func shelves(browseId: String) async throws -> [Shelf] {
+        let json = try await post("browse", client: Self.webRemix, body: ["browseId": browseId])
         var shelves: [Shelf] = []
         func walk(_ node: Any) {
             if let dict = node as? [String: Any] {
@@ -543,7 +565,8 @@ actor InnerTube {
         guard (json["playabilityStatus"] as? [String: Any])?["status"] as? String == "OK" else { throw InnerTubeError.unplayable("video") }
         let formats = ((json["streamingData"] as? [String: Any])?["adaptiveFormats"] as? [[String: Any]]) ?? []
         let avc = formats.filter { ($0["mimeType"] as? String)?.hasPrefix("video/mp4; codecs=\"avc1") == true && $0["url"] != nil }
-        let pick = avc.filter { ($0["height"] as? Int ?? 0) <= 720 }.max { ($0["height"] as? Int ?? 0) < ($1["height"] as? Int ?? 0) } ?? avc.first
+        let maxHeight = UserDefaults.standard.integer(forKey: "quality.video").nonZero ?? 720
+        let pick = avc.filter { ($0["height"] as? Int ?? 0) <= maxHeight }.max { ($0["height"] as? Int ?? 0) < ($1["height"] as? Int ?? 0) } ?? avc.first
         guard let s = pick?["url"] as? String, let url = URL(string: s) else { throw InnerTubeError.noAudio }
         return url
     }
@@ -571,7 +594,8 @@ actor InnerTube {
         let streaming = json["streamingData"] as? [String: Any] ?? [:]
         let formats = (streaming["adaptiveFormats"] as? [[String: Any]] ?? []) + (streaming["formats"] as? [[String: Any]] ?? [])
         func audio(_ itag: Int) -> [String: Any]? { formats.first { ($0["itag"] as? Int) == itag && $0["url"] != nil } }
-        guard let format = audio(140) ?? audio(141) ?? formats.first(where: {
+        let saver = UserDefaults.standard.string(forKey: "quality.audio") == "low"
+        guard let format = (saver ? audio(139) : nil) ?? audio(140) ?? audio(141) ?? formats.first(where: {
             ($0["mimeType"] as? String)?.hasPrefix("audio/mp4") == true && $0["url"] != nil
         }), let urlString = format["url"] as? String, let url = URL(string: urlString) else {
             throw InnerTubeError.noAudio
@@ -587,4 +611,9 @@ actor InnerTube {
         let expires = Double(query["expire"] ?? "").map { Date(timeIntervalSince1970: $0) }
         return AudioStream(url: url, durationMs: durationMs, loudnessDb: loudness, expiresAt: expires)
     }
+}
+
+
+extension Int {
+    var nonZero: Int? { self == 0 ? nil : self }
 }

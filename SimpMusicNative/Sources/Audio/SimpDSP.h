@@ -10,5 +10,7 @@ int simp_reverb_set(const float* irL, const float* irR, int len, float mix);
 void simp_process_channel(int slot, int ch, float* data, int frames);
 MTAudioProcessingTapRef simp_create_tap(int slot) CF_RETURNS_RETAINED;
 double simp_sample_rate(void);
+float simp_level(void);
+void simp_pitch_set(float ratio);
 
 #endif

@@ -9,6 +9,9 @@ struct SearchView: View {
     @State private var searching = false
     @State private var failed = false
     @State private var lastQuery = ""
+    @State private var suggestions: [String] = []
+    @AppStorage("search.history") private var historyRaw = ""
+    private var history: [String] { historyRaw.split(separator: "\n").map(String.init) }
 
     var body: some View {
         List {
@@ -54,6 +57,23 @@ struct SearchView: View {
         .environment(\.defaultMinListRowHeight, 60)
         .navigationTitle("Buscar")
         .searchable(text: $query, prompt: "Músicas, álbuns, artistas")
+        .searchSuggestions {
+            if query.isEmpty {
+                ForEach(history, id: \.self) { item in
+                    Label(item, systemImage: "clock.arrow.circlepath").searchCompletion(item)
+                }
+                if !history.isEmpty { Button("Limpar histórico", role: .destructive) { historyRaw = "" } }
+            } else {
+                ForEach(suggestions, id: \.self) { item in Label(item, systemImage: "magnifyingglass").searchCompletion(item) }
+            }
+        }
+        .task(id: query) {
+            let text = query.trimmingCharacters(in: .whitespaces)
+            guard !text.isEmpty else { suggestions = []; return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            suggestions = await InnerTube.shared.searchSuggestions(text)
+        }
         .onSubmit(of: .search) { Task { await search() } }
         .onChange(of: scope) { _, _ in Task { await search() } }
     }
@@ -62,6 +82,7 @@ struct SearchView: View {
         let text = query.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
         lastQuery = text
+        historyRaw = ([text] + history.filter { $0.caseInsensitiveCompare(text) != .orderedSame }).prefix(20).joined(separator: "\n")
         searching = true
         failed = false
         defer { searching = false }

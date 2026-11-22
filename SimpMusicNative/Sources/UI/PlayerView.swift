@@ -84,6 +84,14 @@ struct PlayerView: View {
                         }
                     }
                 } label: { Label("Velocidade", systemImage: "speedometer") }
+                Menu {
+                    ForEach([-4, -3, -2, -1, 0, 1, 2, 3, 4], id: \.self) { st in
+                        Button { player.setPitch(st) } label: {
+                            let name = st == 0 ? "Original" : (st > 0 ? "+\(st)" : "\(st)")
+                            if player.pitchSemitones == st { Label(name, systemImage: "checkmark") } else { Text(name) }
+                        }
+                    }
+                } label: { Label("Tom", systemImage: "tuningfork") }
                 if let track = player.current {
                     ShareLink(item: URL(string: "https://music.youtube.com/watch?v=\(track.id)")!) { Label("Compartilhar", systemImage: "square.and.arrow.up") }
                 }

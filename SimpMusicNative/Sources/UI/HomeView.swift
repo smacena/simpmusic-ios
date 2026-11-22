@@ -7,6 +7,7 @@ struct HomeView: View {
     @ObservedObject private var account = Account.shared
     @State private var shelves: [InnerTube.Shelf] = []
     @State private var moods: [InnerTube.Shelf] = []
+    @State private var charts: [InnerTube.Shelf] = []
     @State private var chip = 0
     @State private var failed = false
     @State private var showSettings = false
@@ -15,7 +16,7 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 header
-                let content = chip == 0 ? shelves : moods
+                let content = chip == 0 ? shelves : (chip == 1 ? moods : charts)
                 if content.isEmpty && !failed { ProgressView().tint(.white).frame(maxWidth: .infinity).padding(.top, 80) }
                 if failed {
                     VStack(spacing: 12) {
@@ -49,6 +50,7 @@ struct HomeView: View {
             }
             chipButton("Todos", 0)
             chipButton("Mood", 1)
+            chipButton("Charts", 2)
             Spacer()
             Button { Task { await load() } } label: {
                 Image(systemName: "plus").font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
@@ -66,6 +68,7 @@ struct HomeView: View {
         Button {
             chip = value
             if value == 1, moods.isEmpty { Task { moods = (try? await InnerTube.shared.moodsAndGenres()) ?? [] } }
+            if value == 2, charts.isEmpty { Task { charts = (try? await InnerTube.shared.charts()) ?? [] } }
         } label: {
             Text(title)
                 .font(Theme.poppins(15, .medium))
