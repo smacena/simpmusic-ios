@@ -19,8 +19,18 @@ final class Library: ObservableObject {
         let seconds: Double
     }
 
+    /// Settings → Histórico: local tracking on (default) or off, and wiping it.
+    static var trackingEnabled: Bool { UserDefaults.standard.object(forKey: "history.tracking") as? Bool ?? true }
+
+    func clearHistory() {
+        plays.removeAll()
+        recent.removeAll()
+        save(plays, "plays")
+        save(recent, "recent")
+    }
+
     func recordPlay(_ track: Track, seconds: Double) {
-        guard seconds >= 10 else { return }
+        guard Self.trackingEnabled, seconds >= 10 else { return }
         plays.append(PlayEvent(track: track, date: Date(), seconds: seconds))
         if plays.count > 20000 { plays.removeFirst(plays.count - 20000) }
         save(plays, "plays")

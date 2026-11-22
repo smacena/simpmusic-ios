@@ -9,6 +9,14 @@ struct SettingsView: View {
     @State private var sponsorBlock = SponsorBlock.enabled
     @AppStorage("download.liked") private var downloadLiked = false
     @AppStorage("eightd.enabled") private var eightD = false
+    @AppStorage("content.country") private var contentCountry = ""
+    @AppStorage("content.language") private var contentLanguage = ""
+    @AppStorage("content.explicit") private var explicitAllowed = true
+    @AppStorage("video.auto") private var videoAuto = false
+    @AppStorage("radio.audioOnly") private var radioAudioOnly = false
+    @AppStorage("player.saveModes") private var saveModes = true
+    @AppStorage("history.tracking") private var historyTracking = true
+    @State private var confirmClearHistory = false
     @AppStorage("eightd.direction") private var eightDDirection = 1.0
     @AppStorage("eightd.period") private var eightDPeriod = 10.0
     @State private var crossfadeSeconds = PlayerEngine.shared.crossfadeSeconds
@@ -62,6 +70,32 @@ struct SettingsView: View {
                     ForEach(Theme.accents, id: \.key) { Text($0.name).tag($0.key) }
                 }
                 Text("A cor de destaque vale depois de reabrir o app.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Conteúdo") {
+                Picker("País do conteúdo", selection: $contentCountry) {
+                    Text("Do sistema").tag("")
+                    ForEach(["BR", "PT", "US", "GB", "ES", "MX", "AR", "FR", "DE", "IT", "JP", "KR", "IN"], id: \.self) { code in
+                        Text(Locale.current.localizedString(forRegionCode: code) ?? code).tag(code)
+                    }
+                }
+                Picker("Idioma do conteúdo", selection: $contentLanguage) {
+                    Text("Do sistema").tag("")
+                    ForEach(["pt", "en", "es", "fr", "de", "it", "ja", "ko"], id: \.self) { code in
+                        Text(Locale.current.localizedString(forLanguageCode: code) ?? code).tag(code)
+                    }
+                }
+                Text("País e idioma valem a partir da próxima abertura do app.").font(.caption).foregroundStyle(.secondary)
+                Toggle("Mostrar conteúdo explícito", isOn: $explicitAllowed)
+                Toggle("Tocar o vídeo quando a faixa for videoclipe", isOn: $videoAuto)
+                Toggle("Rádio só com áudio (sem videoclipes)", isOn: $radioAudioOnly)
+                Toggle("Salvar aleatório e repetir", isOn: $saveModes)
+            }
+            Section("Histórico de escuta") {
+                Toggle("Registrar o que ouço (só neste aparelho)", isOn: $historyTracking)
+                Button("Limpar histórico", role: .destructive) { confirmClearHistory = true }
+                    .confirmationDialog("Apagar todo o histórico de escuta?", isPresented: $confirmClearHistory, titleVisibility: .visible) {
+                        Button("Apagar", role: .destructive) { Library.shared.clearHistory() }
+                    }
             }
             Section("Qualidade") {
                 Picker("Áudio", selection: $audioQuality) {

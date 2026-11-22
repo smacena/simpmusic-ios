@@ -7,6 +7,16 @@ struct Track: Identifiable, Hashable, Codable {
     let artist: String
     let thumbnail: URL?
     var durationText: String?
+    /// YouTube's explicit badge, when the list showed it.
+    var explicit: Bool? = nil
+    /// MUSIC_VIDEO_TYPE_ATV (song) / OMV (official video) / UGC (user video) / …, when known.
+    var videoType: String? = nil
+
+    /// A video rather than a song (YouTube's own type; unknown counts as song, like the original).
+    var isVideo: Bool { videoType.map { $0 != "MUSIC_VIDEO_TYPE_ATV" } ?? false }
+
+    /// Hidden when the user turned explicit content off.
+    var allowed: Bool { !(explicit == true && UserDefaults.standard.object(forKey: "content.explicit") as? Bool == false) }
 
     /// The largest square-ish artwork: YouTube Music thumbnails carry their size in the URL.
     var artworkLarge: URL? {
@@ -83,8 +93,9 @@ actor InnerTube {
         config.timeoutIntervalForRequest = 20
         config.waitsForConnectivity = false
         session = URLSession(configuration: config)
-        hl = Locale.current.language.languageCode?.identifier ?? "en"
-        gl = Locale.current.region?.identifier ?? "US"
+        // Settings → Conteúdo: country and language of YouTube Music's results (system by default).
+        hl = UserDefaults.standard.string(forKey: "content.language").flatMap { $0.isEmpty ? nil : $0 } ?? Locale.current.language.languageCode?.identifier ?? "en"
+        gl = UserDefaults.standard.string(forKey: "content.country").flatMap { $0.isEmpty ? nil : $0 } ?? Locale.current.region?.identifier ?? "US"
     }
 
     // MARK: Visitor id
@@ -189,7 +200,7 @@ actor InnerTube {
             }
         }
         walk(root)
-        return out
+        return out.filter(\.allowed)
     }
 
     private static func runs(_ column: Any?) -> [[String: Any]] {
@@ -213,7 +224,28 @@ actor InnerTube {
         let thumbs =
             (((item["thumbnail"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any])?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
         let thumb = (thumbs?.last?["url"] as? String).flatMap(URL.init(string:))
-        return Track(id: videoId, title: title, artist: artist, thumbnail: thumb, durationText: duration)
+        return Track(id: videoId, title: title, artist: artist, thumbnail: thumb, durationText: duration,
+                     explicit: hasExplicitBadge(item), videoType: findString("musicVideoType", in: item))
+    }
+
+    static func hasExplicitBadge(_ node: Any?) -> Bool {
+        if let dict = node as? [String: Any] {
+            if let icon = (dict["icon"] as? [String: Any])?["iconType"] as? String, icon == "MUSIC_EXPLICIT_BADGE" { return true }
+            return dict.values.contains { hasExplicitBadge($0) }
+        } else if let array = node as? [Any] {
+            return array.contains { hasExplicitBadge($0) }
+        }
+        return false
+    }
+
+    static func findString(_ key: String, in node: Any?) -> String? {
+        if let dict = node as? [String: Any] {
+            if let v = dict[key] as? String { return v }
+            for value in dict.values { if let v = findString(key, in: value) { return v } }
+        } else if let array = node as? [Any] {
+            for value in array { if let v = findString(key, in: value) { return v } }
+        }
+        return nil
     }
 
     private static func findWatchVideoId(_ node: Any?) -> String? {
@@ -539,7 +571,8 @@ actor InnerTube {
                     let thumb = (thumbs?.last?["url"] as? String).flatMap(URL.init(string:))
                     let length = ((r["lengthText"] as? [String: Any])?["runs"] as? [[String: Any]])?.first?["text"] as? String
                     if !title.isEmpty {
-                        out.append(Track(id: id, title: title, artist: byline.components(separatedBy: " • ").first ?? byline, thumbnail: thumb, durationText: length))
+                        out.append(Track(id: id, title: title, artist: byline.components(separatedBy: " • ").first ?? byline, thumbnail: thumb, durationText: length,
+                                         explicit: Self.hasExplicitBadge(r["badges"]), videoType: Self.findString("musicVideoType", in: r)))
                     }
                     return
                 }
@@ -549,7 +582,13 @@ actor InnerTube {
             }
         }
         walk(json)
-        return out
+        // Settings: explicit filter, and "rádio só áudio" (videos out, unless that empties the page).
+        var result = out.filter(\.allowed)
+        if UserDefaults.standard.bool(forKey: "radio.audioOnly") {
+            let songs = result.filter { !$0.isVideo }
+            if !songs.isEmpty { result = songs }
+        }
+        return result
     }
 
     // MARK: Video stream

@@ -50,15 +50,15 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Estilo do player / estilo da letra / romanização | [x] | [x] |
 | Contas do YouTube (várias) | [x] | [ ] |
 | Idioma do app | [x] | [ ] |
-| País do conteúdo, idioma de áudio preferido | [x] | [ ] |
+| País do conteúdo, idioma de áudio preferido | [x] | [x] |
 | Qualidade (áudio, vídeo, download áudio/vídeo) | [x] | [ ] parcial |
 | Baixar curtidas automaticamente | [x] | [x] |
 | Downloads inteligentes + tamanho | [x] | [ ] |
-| Vídeo em vez de áudio | [x] | [ ] |
-| Rádio só áudio | [x] | [ ] |
+| Vídeo em vez de áudio | [x] | [x] |
+| Rádio só áudio | [x] | [x] |
 | Sincronizar seguidos com YouTube | [x] | [ ] |
 | Enviar histórico ao Google | [x] | [ ] |
-| Conteúdo explícito | [x] | [ ] |
+| Conteúdo explícito | [x] | [x] |
 | Playlists do YouTube offline | [x] | [ ] |
 | Juntar curtidas locais e do YouTube | [x] | [ ] |
 | Proxy (tipo, host, porta, usuário, senha) | [x] | [ ] |
@@ -67,10 +67,10 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Equalizador 10 bandas + AutoEq | [x] | [x] |
 | Delay / Reverb | [x] | [x] |
 | Áudio 8D | [x] | [x] |
-| Salvar estado / aleatório e repetir | [x] | [ ] |
+| Salvar estado / aleatório e repetir | [x] | [x] |
 | Encerrar serviço ao sair | [—] não existe no iOS | [—] |
 | Crossfade, duração, DJ, pular em álbum, AutoMix | [x] | [ ] parcial |
-| Histórico local + limpar histórico | [x] | [ ] |
+| Histórico local + limpar histórico | [x] | [x] |
 | Provedor principal de letra, atraso, idioma da tradução, idioma da legenda | [x] | [ ] parcial |
 | Ajudar a base de letras (nome, e-mail) | [x] | [ ] |
 | IA (provedor, chave, modelo, cabeçalhos, tradução por IA) | [x] | [ ] |

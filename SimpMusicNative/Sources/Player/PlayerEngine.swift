@@ -30,8 +30,14 @@ final class PlayerEngine: ObservableObject {
     @Published private(set) var sleepDeadline: Date?
     @Published private(set) var sleepAtEndOfTrack = false
     private var sleepTask: Task<Void, Never>?
-    @Published var shuffleOn = false
-    @Published var repeatMode = 0 // 0 off, 1 all, 2 one
+    // Saved across launches (Settings → "Salvar aleatório e repetir", on by default).
+    @Published var shuffleOn = PlayerEngine.restoreModes ? UserDefaults.standard.bool(forKey: "player.shuffle") : false {
+        didSet { UserDefaults.standard.set(shuffleOn, forKey: "player.shuffle") }
+    }
+    @Published var repeatMode = PlayerEngine.restoreModes ? UserDefaults.standard.integer(forKey: "player.repeat") : 0 { // 0 off, 1 all, 2 one
+        didSet { UserDefaults.standard.set(repeatMode, forKey: "player.repeat") }
+    }
+    static var restoreModes: Bool { UserDefaults.standard.object(forKey: "player.saveModes") as? Bool ?? true }
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
 
@@ -462,6 +468,8 @@ final class PlayerEngine: ObservableObject {
         publishNowPlaying()
         prefetchNext()
         if let track = current { Library.shared.addRecent(track) }
+        // Settings: "Vídeo em vez de áudio" plays a music video's picture when the track is one.
+        if UserDefaults.standard.bool(forKey: "video.auto"), current?.isVideo == true, !videoMode { toggleVideo() }
         persistQueue()
         NSLog("SimpNative: playing \(current?.id ?? "?") dur=\(Int(duration))s")
     }
