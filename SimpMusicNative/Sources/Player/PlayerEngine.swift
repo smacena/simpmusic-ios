@@ -77,7 +77,10 @@ final class PlayerEngine: ObservableObject {
         AudioEffects.shared.applyStored()
         restoreQueue()
         sessionObservers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.persistQueue() }
+            MainActor.assumeIsolated {
+                self?.persistQueue()
+                self?.flushListen()
+            }
         })
     }
 
@@ -90,6 +93,16 @@ final class PlayerEngine: ObservableObject {
     // MARK: Saved queue
 
     private var lastPersist = Date.distantPast
+    /// Listening time of the current song, for the stats; flushed when the song changes.
+    private var listenedSeconds: Double = 0
+    private var listenedTrack: Track?
+    private var lastTick = Date()
+
+    private func flushListen() {
+        if let track = listenedTrack { Library.shared.recordPlay(track, seconds: listenedSeconds) }
+        listenedTrack = current
+        listenedSeconds = 0
+    }
 
     /// The queue and position, saved so the next launch resumes where this one stopped (paused).
     private func persistQueue() {
@@ -532,6 +545,10 @@ final class PlayerEngine: ObservableObject {
         let seconds = player.currentTime().seconds
         if seconds.isFinite { position = seconds }
         updatePlayingState()
+        let now = Date()
+        if listenedTrack?.id != current?.id { flushListen() }
+        if isPlaying { listenedSeconds += min(1, now.timeIntervalSince(lastTick)) * Double(rate) }
+        lastTick = now
         syncVideo()
         if isPlaying, Date().timeIntervalSince(lastPersist) > 10 { persistQueue() }
         // With the inflated length AVPlayer may keep "playing" past the real end, or wait for

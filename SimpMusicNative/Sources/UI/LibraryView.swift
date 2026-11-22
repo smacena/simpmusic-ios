@@ -73,6 +73,10 @@ struct LibraryView: View {
             .pickerStyle(.segmented)
             .listRowSeparator(.hidden)
             .listRowBackground(Theme.background)
+            NavigationLink { StatsView() } label: {
+                Label("Estatísticas de escuta", systemImage: "chart.bar.fill").font(Theme.poppins(16, .medium)).foregroundStyle(.white)
+            }
+            .listRowBackground(Theme.surface)
             playlistsSection
             let tracks = section == 0 ? library.favorites : section == 1 ? library.downloaded : section == 2 ? library.recent : (accountLikes ?? [])
             if section == 3, accountLikes == nil { ProgressView().frame(maxWidth: .infinity) }

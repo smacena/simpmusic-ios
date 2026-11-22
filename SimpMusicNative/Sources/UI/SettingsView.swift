@@ -53,6 +53,11 @@ struct SettingsView: View {
             }
             Section("Equalizador") {
                 Toggle("Ativado", isOn: $effects.eqEnabled)
+                NavigationLink {
+                    AutoEqView()
+                } label: {
+                    LabeledContent("Perfil do fone (AutoEq)", value: UserDefaults.standard.string(forKey: "eq.autoeqName") ?? "Nenhum")
+                }
                 if effects.eqEnabled {
                     Picker("Predefinição", selection: Binding(
                         get: { AudioEffects.presets.firstIndex { $0.gains == effects.gains } ?? -1 },

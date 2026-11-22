@@ -10,6 +10,21 @@ final class Library: ObservableObject {
     @Published private(set) var recent: [Track] = []
     @Published private(set) var downloaded: [Track] = []
     @Published private(set) var playlists: [LocalPlaylist] = []
+    @Published private(set) var plays: [PlayEvent] = []
+
+    /// One listen: what, when, and for how long (only listens of 10 s or more are kept).
+    struct PlayEvent: Codable, Hashable {
+        let track: Track
+        let date: Date
+        let seconds: Double
+    }
+
+    func recordPlay(_ track: Track, seconds: Double) {
+        guard seconds >= 10 else { return }
+        plays.append(PlayEvent(track: track, date: Date(), seconds: seconds))
+        if plays.count > 20000 { plays.removeFirst(plays.count - 20000) }
+        save(plays, "plays")
+    }
 
     struct LocalPlaylist: Identifiable, Codable, Hashable {
         var id = UUID()
@@ -28,6 +43,7 @@ final class Library: ObservableObject {
         recent = load("recent") ?? []
         downloaded = load("downloaded") ?? []
         playlists = load("playlists") ?? []
+        plays = load("plays") ?? []
     }
 
     // MARK: Own playlists
