@@ -22,7 +22,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Estatísticas (períodos, relógio, impressão digital, décadas) | [x] | [ ] parcial |
 | Wrapped (10 cartões, compartilhar) | [x] | [ ] parcial |
 | Ouvir Junto | [x] | [ ] |
-| Login YouTube / Spotify / Last.fm / Discord | [x] | [ ] só YouTube |
+| Login YouTube / Spotify (Last.fm e Discord: usuário não quer) | [x] | [ ] só YouTube |
 | Créditos / Sobre / Bibliotecas | [x] | [x] |
 | Log do app (opções de desenvolvedor) | [x] | [ ] |
 
@@ -75,8 +75,8 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Ajudar a base de letras (nome, e-mail) | [x] | [ ] |
 | IA (provedor, chave, modelo, cabeçalhos, tradução por IA) | [x] | [ ] |
 | Spotify (letras, Canvas) / capa animada | [x] | [ ] |
-| Discord Rich Presence | [?] precisa de chave | [ ] |
-| Last.fm scrobble | [?] precisa de chave | [ ] |
+| Discord Rich Presence | [—] usuário não quer | [—] usuário não quer |
+| Last.fm scrobble | [—] usuário não quer | [—] usuário não quer |
 | SponsorBlock + categorias | [x] | [x] |
 | Armazenamento / cache do player / limites | [x] (sem limite: AVPlayer não tem cache próprio) | [ ] |
 | Backup de baixadas, backup automático, frequência, manter N | [x] | [x] |
@@ -86,5 +86,5 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Log do app | [x] | [ ] |
 | Sincronizar login | [x] | [x] só YouTube |
 | Sincronizar biblioteca (canal pareado) | [ ] | [ ] |
-| Shazam | [?] conta paga Apple | [?] |
+| Shazam | [—] usuário não quer | [—] usuário não quer |
 | Android Auto / Google Cast | [—] AirPlay no lugar | [—] |
