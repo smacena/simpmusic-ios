@@ -88,5 +88,8 @@ fun MainViewController() =
             ) { _ -> imageLoader.memoryCache?.clear() }
             imageLoader
         }
+        // Smart downloads, as Android's MainActivity does on start (the repository decides if due).
+        val sharedViewModel: com.maxrave.simpmusic.viewModel.SharedViewModel = org.koin.compose.koinInject()
+        androidx.compose.runtime.LaunchedEffect(Unit) { sharedViewModel.runSmartDownloadsIfDue() }
         App()
     }

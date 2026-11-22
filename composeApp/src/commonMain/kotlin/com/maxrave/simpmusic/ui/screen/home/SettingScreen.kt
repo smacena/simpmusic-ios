@@ -1197,8 +1197,8 @@ fun SettingScreen(
                     smallSubtitle = true,
                     switch = (autoDownloadLikedSongs to { viewModel.setAutoDownloadLikedSongs(it) }),
                 )
-                // Smart downloads are Android only.
-                if (getPlatform() == Platform.Android) {
+                // Smart downloads: Android and iOS (both have a download handler).
+                if (getPlatform() == Platform.Android || getPlatform() == Platform.iOS) {
                     SettingItem(
                         title = stringResource(Res.string.smart_downloads),
                         subtitle =
@@ -2318,7 +2318,7 @@ fun SettingScreen(
                 )
             }
         }
-        if (getPlatform() == Platform.Android) {
+        if (getPlatform() == Platform.Android || getPlatform() == Platform.iOS) {
             item(key = "storage") {
                 SettingGroup(title = stringResource(Res.string.storage)) {
                     SettingItem(
@@ -2389,7 +2389,8 @@ fun SettingScreen(
                             )
                         },
                     )
-                    SettingItem(
+                    // ExoPlayer's cache limit; AVPlayer has no such cache.
+                    if (getPlatform() == Platform.Android) SettingItem(
                         title = stringResource(Res.string.limit_player_cache),
                         subtitle = LIMIT_CACHE_SIZE.getItemFromData(limitPlayerCache).toString(),
                         onClick = {

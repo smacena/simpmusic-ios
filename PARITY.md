@@ -53,7 +53,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | País do conteúdo, idioma de áudio preferido | [x] | [ ] |
 | Qualidade (áudio, vídeo, download áudio/vídeo) | [x] | [ ] parcial |
 | Baixar curtidas automaticamente | [x] | [x] |
-| Downloads inteligentes + tamanho | [ ] | [ ] |
+| Downloads inteligentes + tamanho | [x] | [ ] |
 | Vídeo em vez de áudio | [x] | [ ] |
 | Rádio só áudio | [x] | [ ] |
 | Sincronizar seguidos com YouTube | [x] | [ ] |
@@ -78,7 +78,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Discord Rich Presence | [?] precisa de chave | [ ] |
 | Last.fm scrobble | [?] precisa de chave | [ ] |
 | SponsorBlock + categorias | [x] | [ ] parcial |
-| Armazenamento / cache do player / limites | [ ] | [ ] |
+| Armazenamento / cache do player / limites | [x] (sem limite: AVPlayer não tem cache próprio) | [ ] |
 | Backup de baixadas, backup automático, frequência, manter N | [x] | [ ] parcial |
 | Backup/restauração compatível com Android/desktop | [x] | [ ] |
 | Importar playlists de outros apps | [x] | [ ] |

@@ -40,20 +40,7 @@ actual fun loadMediaService() {
                     streamRepository = get(),
                 )
             }
-            // AVPlayer streams straight from the network: no song cache on disk yet.
-            single<CacheRepository> {
-                object : CacheRepository {
-                    override suspend fun getCacheSize(cacheName: String): Long = 0L
-
-                    override fun clearCache(cacheName: String) {}
-
-                    override suspend fun getAllCacheKeys(cacheName: String): List<String> = emptyList()
-
-                    override suspend fun getFullyCachedSongIds(): List<String> = emptyList()
-
-                    override suspend fun removeCachedSong(videoId: String) {}
-                }
-            }
+            single<CacheRepository> { com.maxrave.data.repository.IosCacheRepository() }
             single<DownloadHandler> { IosDownloadHandler(songRepository = get(), dataStoreManager = get()) }
         },
     )
