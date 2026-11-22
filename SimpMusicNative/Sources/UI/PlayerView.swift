@@ -47,7 +47,7 @@ struct PlayerView: View {
             VStack(spacing: 0) {
                 HStack {
                     Button { dismiss() } label: {
-                        Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold)).foregroundStyle(scheme.onSurface)
+                        Image(icon: "chevron.down").font(.system(size: 18, weight: .semibold)).foregroundStyle(scheme.onSurface)
                             .frame(width: 44, height: 44).background(scheme.surfaceContainerHigh, in: Circle())
                     }
                     VStack(spacing: 0) {
@@ -56,7 +56,7 @@ struct PlayerView: View {
                     }
                     .frame(maxWidth: .infinity)
                     Menu { moreMenuItems } label: {
-                        Image(systemName: "ellipsis").rotationEffect(.degrees(90)).font(.system(size: 18, weight: .semibold)).foregroundStyle(scheme.onSurface)
+                        Image(icon: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(scheme.onSurface)
                             .frame(width: 44, height: 44).background(scheme.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 14))
                     }
                 }
@@ -86,7 +86,7 @@ struct PlayerView: View {
                     if let track = player.current {
                         let liked = library.isFavorite(track)
                         Button { library.toggleFavorite(track) } label: {
-                            Image(systemName: liked ? "heart.fill" : "heart").font(.system(size: 20, weight: .semibold))
+                            Image(icon: liked ? "heart.fill" : "heart").font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(liked ? scheme.onPrimaryContainer : scheme.onSurfaceVariant)
                                 .frame(width: 48, height: 48)
                                 .background(liked ? scheme.primaryContainer : scheme.surfaceContainerHigh, in: Circle())
@@ -115,7 +115,7 @@ struct PlayerView: View {
                 ConnectedGroup(scheme: scheme, slots: [
                     .init(icon: "info.circle", action: { showInfo = true }),
                     .init(icon: "headphones", custom: AnyView(ZStack {
-                        Image(systemName: "headphones").font(.system(size: 19, weight: .medium)).foregroundStyle(scheme.onSurfaceVariant)
+                        Image(icon: "headphones").font(.system(size: 19, weight: .medium)).foregroundStyle(scheme.onSurfaceVariant)
                         RoutePicker().opacity(0.02)
                     }), action: nil),
                     .init(icon: "shuffle", active: player.shuffleOn, action: { player.toggleShuffle() }),
@@ -163,14 +163,14 @@ struct PlayerView: View {
 
     private var topBar: some View {
         HStack {
-            Button { dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 22, weight: .semibold)).frame(width: 44, height: 44) }
+            Button { dismiss() } label: { Image(icon: "chevron.down").font(.system(size: 22, weight: .semibold)).frame(width: 44, height: 44) }
             Spacer()
             VStack(spacing: 2) {
                 Text("TOCANDO AGORA").font(Theme.poppins(13, .medium)).foregroundStyle(.white.opacity(0.85))
                 Text(player.queueTitle).font(Theme.poppins(17, .bold)).lineLimit(1)
             }
             Spacer()
-            Menu { moreMenuItems } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)).font(.system(size: 20, weight: .bold)).frame(width: 44, height: 44) }
+            Menu { moreMenuItems } label: { Image(icon: "ellipsis").font(.system(size: 20, weight: .bold)).frame(width: 44, height: 44) }
         }
     }
 
@@ -260,7 +260,7 @@ struct PlayerView: View {
             Spacer()
             if let track = player.current {
                 Button { library.toggleFavorite(track) } label: {
-                    Image(systemName: library.isFavorite(track) ? "heart.fill" : "heart").font(.system(size: 26))
+                    Image(icon: library.isFavorite(track) ? "heart.fill" : "heart").font(.system(size: 26))
                         .foregroundStyle(library.isFavorite(track) ? Color(red: 1, green: 0.25, blue: 0.5) : .white)
                 }
             }
@@ -310,21 +310,21 @@ struct PlayerView: View {
     /// Material 3 Expressive: shuffle / prev / big play / next / repeat as connected tonal pills.
     private var expressiveTransport: some View {
         HStack(spacing: 8) {
-            pill(width: 56, tint: player.shuffleOn) { player.toggleShuffle() } label: { Image(systemName: "shuffle") }
-            pill(width: 64) { player.previous() } label: { Image(systemName: "backward.fill") }
+            pill(width: 56, tint: player.shuffleOn) { player.toggleShuffle() } label: { Image(icon: "shuffle") }
+            pill(width: 64) { player.previous() } label: { Image(icon: "backward.fill") }
             Button { player.togglePlayPause() } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: player.isPlaying ? 28 : 40).fill(Color.white)
                     if player.isLoading { ProgressView().tint(.black) } else {
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 30)).foregroundStyle(artwork.color)
+                        Image(icon: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 30)).foregroundStyle(artwork.color)
                     }
                 }
                 .frame(maxWidth: .infinity).frame(height: 80)
                 .animation(.spring(response: 0.35, dampingFraction: 0.6), value: player.isPlaying)
             }
-            pill(width: 64) { player.next() } label: { Image(systemName: "forward.fill") }
+            pill(width: 64) { player.next() } label: { Image(icon: "forward.fill") }
             pill(width: 56, tint: player.repeatMode != 0) { player.cycleRepeat() } label: {
-                Image(systemName: player.repeatMode == 2 ? "repeat.1" : "repeat")
+                Image(icon: player.repeatMode == 2 ? "repeat.1" : "repeat")
             }
         }
         .font(.system(size: 22, weight: .semibold))
@@ -343,33 +343,33 @@ struct PlayerView: View {
     private var appleTransport: some View {
         HStack {
             Spacer()
-            Button { player.previous() } label: { Image(systemName: "backward.fill").font(.system(size: 36)) }
+            Button { player.previous() } label: { Image(icon: "backward.fill").font(.system(size: 36)) }
             Spacer()
             Button { player.togglePlayPause() } label: {
                 Group {
                     if player.isLoading { ProgressView().tint(.white) } else {
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 48))
+                        Image(icon: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 48))
                     }
                 }
                 .frame(width: 70, height: 70)
             }
             Spacer()
-            Button { player.next() } label: { Image(systemName: "forward.fill").font(.system(size: 36)) }
+            Button { player.next() } label: { Image(icon: "forward.fill").font(.system(size: 36)) }
             Spacer()
         }
     }
 
     private var appleBottomRow: some View {
         HStack {
-            Button { showLyrics = true } label: { Image(systemName: "quote.bubble") }
+            Button { showLyrics = true } label: { Image(icon: "quote.bubble") }
             Spacer()
             RoutePicker().frame(width: 30, height: 30)
             Spacer()
             Button { player.toggleVideo() } label: {
-                Image(systemName: player.videoMode ? "music.note" : "play.rectangle").foregroundStyle(player.videoMode ? Theme.seed : .white)
+                Image(icon: player.videoMode ? "music.note" : "play.rectangle").foregroundStyle(player.videoMode ? Theme.seed : .white)
             }
             Spacer()
-            Button { showQueue = true } label: { Image(systemName: "list.bullet") }
+            Button { showQueue = true } label: { Image(icon: "list.bullet") }
         }
         .font(.system(size: 22, weight: .regular))
         .padding(.horizontal, 30)
@@ -377,23 +377,23 @@ struct PlayerView: View {
 
     private var transport: some View {
         HStack {
-            Button { player.toggleShuffle() } label: { Image(systemName: "shuffle").foregroundStyle(player.shuffleOn ? Theme.seed : .white) }
+            Button { player.toggleShuffle() } label: { Image(icon: "shuffle").foregroundStyle(player.shuffleOn ? Theme.seed : .white) }
             Spacer()
-            Button { player.previous() } label: { Image(systemName: "backward.end.fill").font(.system(size: 30)) }
+            Button { player.previous() } label: { Image(icon: "backward.end.fill").font(.system(size: 30)) }
             Spacer()
             Button { player.togglePlayPause() } label: {
                 ZStack {
                     Circle().fill(Color.white).frame(width: 76, height: 76)
                     if player.isLoading { ProgressView().tint(.black) } else {
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 32)).foregroundStyle(.black)
+                        Image(icon: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 32)).foregroundStyle(.black)
                     }
                 }
             }
             Spacer()
-            Button { player.next() } label: { Image(systemName: "forward.end.fill").font(.system(size: 30)) }
+            Button { player.next() } label: { Image(icon: "forward.end.fill").font(.system(size: 30)) }
             Spacer()
             Button { player.cycleRepeat() } label: {
-                Image(systemName: player.repeatMode == 2 ? "repeat.1" : "repeat").foregroundStyle(player.repeatMode == 0 ? .white : Theme.seed)
+                Image(icon: player.repeatMode == 2 ? "repeat.1" : "repeat").foregroundStyle(player.repeatMode == 0 ? .white : Theme.seed)
             }
         }
         .font(.system(size: 24, weight: .semibold))
@@ -401,21 +401,21 @@ struct PlayerView: View {
 
     private var bottomRow: some View {
         HStack(spacing: 22) {
-            Button { showInfo = true } label: { Image(systemName: "info.circle.fill") }
+            Button { showInfo = true } label: { Image(icon: "info.circle.fill") }
             RoutePicker().frame(width: 30, height: 30)
-            Button { showLyrics = true } label: { Image(systemName: "text.bubble.fill") }
+            Button { showLyrics = true } label: { Image(icon: "text.bubble.fill") }
             Button { player.toggleVideo() } label: {
                 if player.videoLoading { ProgressView().tint(.white) } else {
-                    Image(systemName: player.videoMode ? "music.note" : "play.rectangle.fill").foregroundStyle(player.videoMode ? Theme.seed : .white)
+                    Image(icon: player.videoMode ? "music.note" : "play.rectangle.fill").foregroundStyle(player.videoMode ? Theme.seed : .white)
                 }
             }
             .frame(width: 34, height: 34)
             .contentShape(Rectangle())
             Spacer()
             if let track = player.current {
-                Button { addTo = track } label: { Image(systemName: "text.badge.plus") }
+                Button { addTo = track } label: { Image(icon: "text.badge.plus") }
             }
-            Button { showQueue = true } label: { Image(systemName: "list.bullet") }
+            Button { showQueue = true } label: { Image(icon: "list.bullet") }
         }
         .font(.system(size: 22, weight: .semibold))
     }

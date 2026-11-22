@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+ <g id="Notes"><text>Material Symbols Rounded (Apache 2.0), from SimpMusic's ui/icon/Settings.kt</text></g>
+ <g id="Guides">
+  <line id="Baseline-S" x1="263" x2="3036" y1="696" y2="696" stroke="black"/>
+  <line id="Capline-S" x1="263" x2="3036" y1="625.541" y2="625.541" stroke="black"/>
+  <line id="Baseline-M" x1="263" x2="3036" y1="1126" y2="1126" stroke="black"/>
+  <line id="Capline-M" x1="263" x2="3036" y1="1055.54" y2="1055.54" stroke="black"/>
+  <line id="Baseline-L" x1="263" x2="3036" y1="1556" y2="1556" stroke="black"/>
+  <line id="Capline-L" x1="263" x2="3036" y1="1485.54" y2="1485.54" stroke="black"/>
+  <line id="left-margin-Regular-M" x1="1391.00" x2="1391.00" y1="1030.79" y2="1150.12" stroke="black"/>
+  <line id="right-margin-Regular-M" x1="1491.80" x2="1491.80" y1="1030.79" y2="1150.12" stroke="black"/>
+ </g>
+ <g id="Symbols">
+  <g id="Regular-M" transform="matrix(4.2 0 0 4.2 1391.0 1040.370)">
+   <path d="M10.83 22 Q10.15 22 9.66 21.55 T9.08 20.45 L8.85 18.8 Q8.53 18.68 8.24 18.5 T7.68 18.13 L6.13 18.77 Q5.5 19.05 4.88 18.83 T3.9 18.02 L2.73 15.98 Q2.38 15.4 2.53 14.75 T3.2 13.68 l1.33 -1 Q4.5 12.5 4.5 12.34 q0 -0.16 0 -0.34 t0 -0.34 T4.53 11.33 l-1.33 -1 Q2.68 9.9 2.53 9.25 T2.73 8.02 L3.9 5.97 Q4.25 5.4 4.88 5.18 T6.13 5.22 L7.68 5.88 Q7.95 5.68 8.25 5.5 T8.85 5.2 L9.08 3.55 Q9.18 2.9 9.66 2.45 T10.83 2 h2.35 q0.68 0 1.16 0.45 t0.59 1.1 L15.15 5.2 q0.33 0.13 0.61 0.3 t0.56 0.38 L17.88 5.22 Q18.5 4.95 19.13 5.18 t0.98 0.8 l1.18 2.05 q0.35 0.58 0.2 1.23 T20.8 10.33 l-1.32 1 q0.02 0.18 0.02 0.34 t0 0.34 t0 0.34 t-0.05 0.34 l1.32 1 q0.52 0.43 0.68 1.08 t-0.2 1.22 l-1.2 2.05 q-0.35 0.58 -0.98 0.8 T17.83 18.77 l-1.5 -0.65 q-0.27 0.2 -0.57 0.38 t-0.6 0.3 l-0.22 1.65 q-0.1 0.65 -0.59 1.1 T13.18 22 H10.83 Z m1.22 -6.5 q1.45 0 2.47 -1.03 T15.55 12 T14.53 9.52 T12.05 8.5 q-1.47 0 -2.49 1.02 T8.55 12 t1.01 2.47 t2.49 1.03 Z"/>
+  </g>
+ </g>
+</svg>

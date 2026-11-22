@@ -44,7 +44,7 @@ struct WrappedView: View {
                 HStack {
                     Text("SimpMusic Wrapped \(String(year))").font(Theme.poppins(14, .medium)).opacity(0.8)
                     Spacer()
-                    Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 18, weight: .bold)).frame(width: 40, height: 40) }
+                    Button { dismiss() } label: { Image(icon: "xmark").font(.system(size: 18, weight: .bold)).frame(width: 40, height: 40) }
                 }
                 Spacer()
                 card.transition(.opacity).id(page)

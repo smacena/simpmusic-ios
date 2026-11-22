@@ -26,10 +26,10 @@ struct StatsView: View {
                 .pickerStyle(.segmented)
                 Button { showWrapped = true } label: {
                     HStack {
-                        Image(systemName: "sparkles")
+                        Image(icon: "sparkles")
                         Text("SimpMusic Wrapped").font(Theme.poppins(17, .bold))
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(icon: "chevron.right")
                     }
                     .foregroundStyle(.white)
                     .padding(16)

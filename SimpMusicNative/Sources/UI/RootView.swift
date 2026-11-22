@@ -49,7 +49,7 @@ private struct TabBar: View {
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(Capsule().stroke(Color.white.opacity(0.06)))
             Button { tab = .search } label: {
-                Image(systemName: "magnifyingglass").font(.system(size: 22, weight: .semibold))
+                Image(icon: "magnifyingglass").font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(tab == .search ? Theme.seed : .white)
                     .frame(width: 60, height: 60)
                     .background(.ultraThinMaterial, in: Circle())
@@ -61,7 +61,7 @@ private struct TabBar: View {
     private func item(_ value: RootView.Tab, _ icon: String, _ title: String) -> some View {
         Button { tab = value } label: {
             VStack(spacing: 2) {
-                Image(systemName: icon).font(.system(size: 20, weight: .semibold))
+                Image(icon: icon).font(.system(size: 20, weight: .semibold))
                 Text(title).font(Theme.poppins(12, .medium))
             }
             .foregroundStyle(tab == value ? Theme.seed : Color.white.opacity(0.85))

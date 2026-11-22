@@ -10,19 +10,19 @@ struct MiniPlayer: View {
         if let track = player.current {
             HStack(spacing: 0) {
                 HStack(spacing: 18) {
-                    Button { player.toggleShuffle() } label: { Image(systemName: "shuffle").foregroundStyle(player.shuffleOn ? Theme.seed : .white) }
-                    Button { player.previous() } label: { Image(systemName: "backward.end.fill") }
+                    Button { player.toggleShuffle() } label: { Image(icon: "shuffle").foregroundStyle(player.shuffleOn ? Theme.seed : .white) }
+                    Button { player.previous() } label: { Image(icon: "backward.end.fill") }
                     Button { player.togglePlayPause() } label: {
                         Group {
                             if player.isLoading { ProgressView().tint(.white) } else {
-                                Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 26))
+                                Image(icon: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 26))
                             }
                         }
                         .frame(width: 30)
                     }
-                    Button { player.next() } label: { Image(systemName: "forward.end.fill") }
+                    Button { player.next() } label: { Image(icon: "forward.end.fill") }
                     Button { player.cycleRepeat() } label: {
-                        Image(systemName: player.repeatMode == 2 ? "repeat.1" : "repeat").foregroundStyle(player.repeatMode == 0 ? .white : Theme.seed)
+                        Image(icon: player.repeatMode == 2 ? "repeat.1" : "repeat").foregroundStyle(player.repeatMode == 0 ? .white : Theme.seed)
                     }
                 }
                 .font(.system(size: 18, weight: .semibold))

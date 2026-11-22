@@ -23,7 +23,7 @@ struct LyricsView: View {
             LinearGradient(colors: [artwork.color, Theme.background], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Button { dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 22, weight: .semibold)).frame(width: 44, height: 44) }
+                    Button { dismiss() } label: { Image(icon: "chevron.down").font(.system(size: 22, weight: .semibold)).frame(width: 44, height: 44) }
                     VStack(alignment: .leading, spacing: 0) {
                         Text(player.current?.title ?? "").font(Theme.poppins(16, .bold)).lineLimit(1)
                         Text(player.current?.artist ?? "").font(Theme.poppins(13)).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
@@ -108,7 +108,7 @@ struct ShareLyricsButton: View {
     @State private var showShare = false
 
     var body: some View {
-        Button { render() } label: { Image(systemName: "square.and.arrow.up").font(.system(size: 18, weight: .semibold)).frame(width: 40, height: 40) }
+        Button { render() } label: { Image(icon: "square.and.arrow.up").font(.system(size: 18, weight: .semibold)).frame(width: 40, height: 40) }
             .sheet(isPresented: $showShare) {
                 if let image {
                     VStack(spacing: 20) {

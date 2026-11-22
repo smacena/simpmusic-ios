@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+ <g id="Notes"><text>Material Symbols Rounded (Apache 2.0), from SimpMusic's ui/icon/Person.kt</text></g>
+ <g id="Guides">
+  <line id="Baseline-S" x1="263" x2="3036" y1="696" y2="696" stroke="black"/>
+  <line id="Capline-S" x1="263" x2="3036" y1="625.541" y2="625.541" stroke="black"/>
+  <line id="Baseline-M" x1="263" x2="3036" y1="1126" y2="1126" stroke="black"/>
+  <line id="Capline-M" x1="263" x2="3036" y1="1055.54" y2="1055.54" stroke="black"/>
+  <line id="Baseline-L" x1="263" x2="3036" y1="1556" y2="1556" stroke="black"/>
+  <line id="Capline-L" x1="263" x2="3036" y1="1485.54" y2="1485.54" stroke="black"/>
+  <line id="left-margin-Regular-M" x1="1391.00" x2="1391.00" y1="1030.79" y2="1150.12" stroke="black"/>
+  <line id="right-margin-Regular-M" x1="1491.80" x2="1491.80" y1="1030.79" y2="1150.12" stroke="black"/>
+ </g>
+ <g id="Symbols">
+  <g id="Regular-M" transform="matrix(4.2 0 0 4.2 1391.0 1040.370)">
+   <path d="M9.18 10.83 Q8 9.65 8 8 T9.18 5.18 T12 4 t2.83 1.18 T16 8 t-1.17 2.82 T12 12 T9.18 10.83 Z M4 18 V17.2 Q4 16.35 4.44 15.64 Q4.88 14.93 5.6 14.55 Q7.15 13.77 8.75 13.39 T12 13 t3.25 0.39 t3.15 1.16 q0.72 0.38 1.16 1.09 T20 17.2 V18 q0 0.82 -0.59 1.41 T18 20 H6 Q5.18 20 4.59 19.41 T4 18 Z"/>
+  </g>
+ </g>
+</svg>

@@ -21,7 +21,7 @@ struct LocalPlaylistView: View {
                     if !playlist.tracks.isEmpty {
                         HStack(spacing: 18) {
                             Button { player.play(playlist.tracks.shuffled(), title: playlist.name) } label: {
-                                Image(systemName: "shuffle").font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
+                                Image(icon: "shuffle").font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
                                     .frame(width: 52, height: 52).background(Theme.surfaceHigh, in: Circle())
                             }
                             Button { player.play(playlist.tracks, title: playlist.name) } label: {
@@ -29,7 +29,7 @@ struct LocalPlaylistView: View {
                                     .frame(width: 140, height: 52).background(Color.white, in: Capsule())
                             }
                             Button { Downloads.shared.downloadAll(playlist.tracks) } label: {
-                                Image(systemName: "arrow.down.circle").font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
+                                Image(icon: "arrow.down.circle").font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
                                     .frame(width: 52, height: 52).background(Theme.surfaceHigh, in: Circle())
                             }
                         }
@@ -59,7 +59,7 @@ struct LocalPlaylistView: View {
                     Button { newName = playlist?.name ?? ""; renaming = true } label: { Label("Renomear", systemImage: "pencil") }
                     EditButton()
                     Button(role: .destructive) { library.deletePlaylist(id); dismiss() } label: { Label("Apagar playlist", systemImage: "trash") }
-                } label: { Image(systemName: "ellipsis.circle") }
+                } label: { Image(icon: "ellipsis.circle") }
             }
         }
         .alert("Renomear playlist", isPresented: $renaming) {
@@ -88,7 +88,7 @@ struct PlaylistCover: View {
             } else {
                 ZStack {
                     LinearGradient(colors: [Theme.seed.opacity(0.7), Theme.surfaceHigh], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    Image(systemName: "music.note.list").font(.system(size: geo.size.width / 3)).foregroundStyle(.white.opacity(0.8))
+                    Image(icon: "music.note.list").font(.system(size: geo.size.width / 3)).foregroundStyle(.white.opacity(0.8))
                 }
             }
         }
@@ -126,7 +126,7 @@ struct AddToPlaylistSheet: View {
                                 Text("\(playlist.tracks.count) faixas").font(Theme.bodySmall).foregroundStyle(Theme.body)
                             }
                             Spacer()
-                            if playlist.tracks.contains(where: { $0.id == track.id }) { Image(systemName: "checkmark").foregroundStyle(Theme.seed) }
+                            if playlist.tracks.contains(where: { $0.id == track.id }) { Image(icon: "checkmark").foregroundStyle(Theme.seed) }
                         }
                     }
                     .listRowBackground(Theme.surface)

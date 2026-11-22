@@ -42,7 +42,7 @@ struct HomeView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Button { showSettings = true } label: {
-                Image(systemName: account.isSignedIn ? "person.crop.circle.fill.badge.checkmark" : "person.fill")
+                Image(icon: account.isSignedIn ? "person.crop.circle.fill.badge.checkmark" : "person.fill")
                     .font(.system(size: 20))
                     .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
@@ -57,7 +57,7 @@ struct HomeView: View {
                 .padding(1)
             }
             Button { showSettings = true } label: {
-                Image(systemName: "gearshape.fill").font(.system(size: 22)).foregroundStyle(.white).frame(width: 36, height: 36)
+                Image(icon: "gearshape.fill").font(.system(size: 22)).foregroundStyle(.white).frame(width: 36, height: 36)
             }
         }
         .padding(.horizontal, 16)
@@ -170,7 +170,7 @@ struct CollectionView: View {
                 if let tracks, !tracks.isEmpty {
                     HStack(spacing: 18) {
                         Button { player.play(tracks.shuffled(), title: collection.title) } label: {
-                            Image(systemName: "shuffle").font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
+                            Image(icon: "shuffle").font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
                                 .frame(width: 52, height: 52).background(Theme.surfaceHigh, in: Circle())
                         }
                         Button { player.play(tracks, title: collection.title) } label: {
@@ -178,7 +178,7 @@ struct CollectionView: View {
                                 .frame(width: 140, height: 52).background(Color.white, in: Capsule())
                         }
                         Button { Downloads.shared.downloadAll(tracks) } label: {
-                            Image(systemName: "arrow.down.circle.fill").font(.system(size: 22)).foregroundStyle(.white)
+                            Image(icon: "arrow.down.circle.fill").font(.system(size: 22)).foregroundStyle(.white)
                                 .frame(width: 52, height: 52).background(Theme.surfaceHigh, in: Circle())
                         }
                     }

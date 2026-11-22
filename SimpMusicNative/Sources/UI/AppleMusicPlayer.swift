@@ -108,12 +108,12 @@ struct AppleMusicPlayer: View {
             if let track = player.current {
                 let liked = library.isFavorite(track)
                 Button { library.toggleFavorite(track) } label: {
-                    Image(systemName: liked ? "star.fill" : "star").font(.system(size: 22)).frame(width: 32, height: 32)
+                    Image(icon: liked ? "star.fill" : "star").font(.system(size: 22)).frame(width: 32, height: 32)
                         .symbolEffect(.bounce, value: liked)
                 }
             }
             Menu { menu } label: {
-                Image(systemName: "ellipsis").font(.system(size: 16, weight: .bold)).frame(width: 30, height: 30)
+                Image(icon: "ellipsis").font(.system(size: 16, weight: .bold)).frame(width: 30, height: 30)
                     .background(.white.opacity(0.15), in: Circle())
             }
         }
@@ -176,7 +176,7 @@ struct AppleMusicPlayer: View {
                 Button { player.togglePlayPause() } label: {
                     Group {
                         if player.isLoading { ProgressView().tint(.white) } else {
-                            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 44))
+                            Image(icon: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 44))
                         }
                     }
                     .frame(width: 76, height: 76)
@@ -194,7 +194,7 @@ struct AppleMusicPlayer: View {
     }
 
     private func glyph(_ alpha: Double, _ name: String, _ size: CGFloat, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: name).font(.system(size: size)).opacity(alpha).frame(width: 52, height: 52) }
+        Button(action: action) { Image(icon: name).font(.system(size: size)).opacity(alpha).frame(width: 52, height: 52) }
     }
 
     /// Lyrics (40pt circle) · capsule [Output | Info] · Queue (40pt circle).
@@ -204,12 +204,12 @@ struct AppleMusicPlayer: View {
             Spacer()
             HStack(spacing: 0) {
                 ZStack {
-                    Image(systemName: "headphones").font(.system(size: 19)).opacity(0.85)
+                    Image(icon: "headphones").font(.system(size: 19)).opacity(0.85)
                     RoutePicker().opacity(0.02)
                 }
                 .frame(width: 64, height: 40)
                 Rectangle().fill(.white.opacity(0.2)).frame(width: 1, height: 20)
-                Button(action: onInfo) { Image(systemName: "info.circle").font(.system(size: 19)).opacity(0.85).frame(width: 64, height: 40) }
+                Button(action: onInfo) { Image(icon: "info.circle").font(.system(size: 19)).opacity(0.85).frame(width: 64, height: 40) }
             }
             .background(.white.opacity(0.12), in: Capsule())
             Spacer()
@@ -219,7 +219,7 @@ struct AppleMusicPlayer: View {
 
     private func dockButton(_ icon: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).font(.system(size: 19, weight: .medium))
+            Image(icon: icon).font(.system(size: 19, weight: .medium))
                 .foregroundStyle(active ? Color.black.opacity(0.8) : .white.opacity(0.85))
                 .frame(width: 40, height: 40)
                 .background(active ? Color.white.opacity(0.85) : .clear, in: Circle())
@@ -260,9 +260,9 @@ struct VolumeRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "speaker.fill").font(.system(size: 13)).opacity(0.6)
+            Image(icon: "speaker.fill").font(.system(size: 13)).opacity(0.6)
             ThinSlider(value: volume) { v in volume = v; host.set(Float(v)) }
-            Image(systemName: "speaker.wave.3.fill").font(.system(size: 13)).opacity(0.6)
+            Image(icon: "speaker.wave.3.fill").font(.system(size: 13)).opacity(0.6)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SystemVolumeDidChange"))) { _ in
             volume = Double(AVAudioSession.sharedInstance().outputVolume)

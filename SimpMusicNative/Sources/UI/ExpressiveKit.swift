@@ -109,15 +109,15 @@ struct ExpressiveTransportRow: View {
             let usable = geo.size.width - 16
             HStack(spacing: 8) {
                 pill(0, width: usable * weights[0] / total, corner: 34, fill: scheme.secondaryContainer, action: onPrev) {
-                    Image(systemName: "backward.fill").font(.system(size: 26)).foregroundStyle(scheme.onSecondaryContainer)
+                    Image(icon: "backward.fill").font(.system(size: 26)).foregroundStyle(scheme.onSecondaryContainer)
                 }
                 pill(1, width: usable * weights[1] / total, corner: isPlaying ? 22 : 34, fill: scheme.primary, action: onPlay) {
                     if loading { ProgressView().tint(scheme.onPrimary) } else {
-                        Image(systemName: isPlaying ? "pause.fill" : "play.fill").font(.system(size: 30)).foregroundStyle(scheme.onPrimary)
+                        Image(icon: isPlaying ? "pause.fill" : "play.fill").font(.system(size: 30)).foregroundStyle(scheme.onPrimary)
                     }
                 }
                 pill(2, width: usable * weights[2] / total, corner: 34, fill: scheme.secondaryContainer, action: onNext) {
-                    Image(systemName: "forward.fill").font(.system(size: 26)).foregroundStyle(scheme.onSecondaryContainer)
+                    Image(icon: "forward.fill").font(.system(size: 26)).foregroundStyle(scheme.onSecondaryContainer)
                 }
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: pressed)
@@ -157,7 +157,7 @@ struct ConnectedGroup: View {
                 )
                 Group {
                     if let custom = slot.custom { custom } else {
-                        Image(systemName: slot.icon).font(.system(size: 19, weight: .medium))
+                        Image(icon: slot.icon).font(.system(size: 19, weight: .medium))
                             .foregroundStyle(slot.active ? scheme.onPrimaryContainer : scheme.onSurfaceVariant)
                     }
                 }

@@ -19,7 +19,7 @@ struct LibraryView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 10).fill(Theme.surfaceHigh)
-                                Image(systemName: "plus").font(.system(size: 34, weight: .semibold)).foregroundStyle(.white)
+                                Image(icon: "plus").font(.system(size: 34, weight: .semibold)).foregroundStyle(.white)
                             }
                             .frame(width: 120, height: 120)
                             Text("Nova playlist").font(Theme.poppins(14, .medium)).foregroundStyle(.white)

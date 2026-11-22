@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+ <g id="Notes"><text>Material Symbols Rounded (Apache 2.0), from SimpMusic's ui/icon/RepeatOne.kt</text></g>
+ <g id="Guides">
+  <line id="Baseline-S" x1="263" x2="3036" y1="696" y2="696" stroke="black"/>
+  <line id="Capline-S" x1="263" x2="3036" y1="625.541" y2="625.541" stroke="black"/>
+  <line id="Baseline-M" x1="263" x2="3036" y1="1126" y2="1126" stroke="black"/>
+  <line id="Capline-M" x1="263" x2="3036" y1="1055.54" y2="1055.54" stroke="black"/>
+  <line id="Baseline-L" x1="263" x2="3036" y1="1556" y2="1556" stroke="black"/>
+  <line id="Capline-L" x1="263" x2="3036" y1="1485.54" y2="1485.54" stroke="black"/>
+  <line id="left-margin-Regular-M" x1="1391.00" x2="1391.00" y1="1030.79" y2="1150.12" stroke="black"/>
+  <line id="right-margin-Regular-M" x1="1491.80" x2="1491.80" y1="1030.79" y2="1150.12" stroke="black"/>
+ </g>
+ <g id="Symbols">
+  <g id="Regular-M" transform="matrix(4.2 0 0 4.2 1391.0 1040.370)">
+   <path d="M11.5 10.5 H10.75 q-0.32 0 -0.54 -0.21 T10 9.75 Q10 9.42 10.21 9.21 T10.75 9 H12 q0.43 0 0.71 0.29 T13 10 v4.25 q0 0.32 -0.21 0.54 T12.25 15 T11.71 14.79 T11.5 14.25 V10.5 Z M6.85 19 L7.7 19.85 q0.3 0.3 0.29 0.7 T7.7 21.25 q-0.3 0.3 -0.71 0.31 T6.28 21.28 L3.7 18.7 Q3.55 18.55 3.49 18.38 T3.43 18 T3.49 17.63 T3.7 17.3 L6.28 14.73 q0.3 -0.3 0.71 -0.29 T7.7 14.75 q0.28 0.3 0.29 0.7 T7.7 16.15 L6.85 17 H17 V14 q0 -0.43 0.29 -0.71 T18 13 t0.71 0.29 T19 14 v3 q0 0.82 -0.59 1.41 T17 19 H6.85 Z M17.15 7 H7 v3 q0 0.42 -0.29 0.71 T6 11 Q5.58 11 5.29 10.71 Q5 10.43 5 10 V7 Q5 6.18 5.59 5.59 T7 5 H17.15 L16.3 4.15 Q16 3.85 16.01 3.45 q0.01 -0.4 0.29 -0.7 q0.3 -0.3 0.71 -0.31 q0.41 -0.01 0.71 0.29 L20.3 5.3 q0.15 0.15 0.21 0.32 T20.58 6 T20.51 6.38 T20.3 6.7 L17.73 9.27 q-0.3 0.3 -0.71 0.29 T16.3 9.25 Q16.03 8.95 16.01 8.55 T16.3 7.85 L17.15 7 Z"/>
+  </g>
+ </g>
+</svg>
