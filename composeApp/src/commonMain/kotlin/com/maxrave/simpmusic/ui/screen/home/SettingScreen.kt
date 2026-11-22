@@ -1459,7 +1459,8 @@ fun SettingScreen(
                 }
             }
         }
-        // Audio: normalization on Android and iOS; skip-silence and the system EQ are Android-only.
+        // Audio: normalization and skip-silence on Android and iOS; the system EQ is Android-only
+        // (iOS gives apps no system equalizer: the Settings app's EQ applies to Apple Music only).
         if (getPlatform() == Platform.Android || getPlatform() == Platform.iOS) {
             item(key = "audio") {
                 SettingGroup(title = stringResource(Res.string.audio)) {
@@ -1468,12 +1469,12 @@ fun SettingScreen(
                         subtitle = stringResource(Res.string.balance_media_loudness),
                         switch = (normalizeVolume to { viewModel.setNormalizeVolume(it) }),
                     )
-                    if (getPlatform() == Platform.Android) {
                     SettingItem(
                         title = stringResource(Res.string.skip_silent),
                         subtitle = stringResource(Res.string.skip_no_music_part),
                         switch = (skipSilent to { viewModel.setSkipSilent(it) }),
                     )
+                    if (getPlatform() == Platform.Android) {
                     val equalizerTypeLabels =
                         listOf(
                             DataStoreManager.EQUALIZER_TYPE_BUILT_IN to stringResource(Res.string.equalizer_type_built_in),
@@ -1676,7 +1677,7 @@ fun SettingScreen(
                                 )
                             },
                         )
-                        if (getPlatform() != Platform.iOS) SettingItem(
+                        SettingItem(
                             title = stringResource(Res.string.crossfade_dj_mode),
                             subtitle =
                                 if (castState.isRemote) {

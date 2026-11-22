@@ -2327,11 +2327,11 @@ class YouTube {
                         listOf(
                             playerResponse.second.streamingData
                                 ?.formats
-                                ?.filter { !it.isAudio && it.url != null }
+                                ?.filter { !it.isAudio && it.url != null && (!downloadsAsAac || it.mimeType.contains("avc1")) }
                                 ?.maxByOrNull { it.bitrate },
                             playerResponse.second.streamingData
                                 ?.adaptiveFormats
-                                ?.filter { !it.isAudio && it.url != null }
+                                ?.filter { !it.isAudio && it.url != null && (!downloadsAsAac || it.mimeType.contains("avc1")) }
                                 ?.maxByOrNull { it.bitrate },
                         ).maxByOrNull { it?.bitrate ?: 0 }
                     Logger.d(TAG, "Audio Format $audioFormat")

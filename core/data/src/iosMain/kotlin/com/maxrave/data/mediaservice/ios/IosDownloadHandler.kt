@@ -4,7 +4,10 @@ package com.maxrave.data.mediaservice.ios
 
 import com.maxrave.common.MERGING_DATA_TYPE
 import com.maxrave.domain.data.entities.DownloadState
+import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
+import com.maxrave.domain.utils.MusicVideoType
+import kotlinx.coroutines.flow.first
 import com.maxrave.domain.repository.SongRepository
 import com.maxrave.domain.utils.isLive
 import com.maxrave.domain.utils.toTrack
@@ -39,6 +42,12 @@ internal fun downloadedAudioPath(videoId: String): String? {
     return path.takeIf { NSFileManager.defaultManager.fileExistsAtPath(it) }
 }
 
+/** The downloaded music video (H.264 + AAC in one MP4) for [videoId], or null. */
+internal fun downloadedVideoPath(videoId: String): String? {
+    val path = "${iosDownloadDir()}/$videoId-SimpMusic.mp4"
+    return path.takeIf { NSFileManager.defaultManager.fileExistsAtPath(it) }
+}
+
 /**
  * Downloads for iOS, after Desktop's DownloadUtils: the shared YouTube.download writes the AAC
  * stream to Documents/downloads/<videoId>.m4a, and both download states (the song row and the
@@ -46,6 +55,7 @@ internal fun downloadedAudioPath(videoId: String): String? {
  */
 internal class IosDownloadHandler(
     private val songRepository: SongRepository,
+    private val dataStoreManager: DataStoreManager,
 ) : DownloadHandler {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -73,8 +83,12 @@ internal class IosDownloadHandler(
         }
         songRepository.updateDownloadState(videoId, DownloadState.STATE_DOWNLOADING)
         publish(videoId, DownloadState.STATE_DOWNLOADING)
+        // Same rule as Android: with "watch video" on, a music video downloads as video + audio.
+        val isVideo =
+            dataStoreManager.watchVideoInsteadOfPlayingAudio.first() == DataStoreManager.TRUE &&
+                MusicVideoType.isVideoSong(song.videoType)
         songRepository
-            .downloadToFile(song.toTrack(), path = "${iosDownloadDir()}/$videoId", videoId = videoId, isVideo = false)
+            .downloadToFile(song.toTrack(), path = "${iosDownloadDir()}/$videoId", videoId = videoId, isVideo = isVideo)
             .collect { state ->
                 when {
                     state.isError -> {

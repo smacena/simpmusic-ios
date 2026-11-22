@@ -99,5 +99,13 @@ actual fun getPackageName(): String = NSBundle.mainBundle.bundleIdentifier ?: "c
 
 actual fun getFileDir(): String = iosDocumentsPath()
 
-// iOS sets an app's language from the system Settings app (per-app language), not from inside.
-actual fun changeLanguageNative(code: String) = Unit
+/**
+ * iOS keeps the app's language in the AppleLanguages default (the same one the per-app language
+ * in the Settings app writes). Compose resources read NSLocale.preferredLanguages, which follows
+ * it, so the new language applies from the next launch; the screen tells the user to reopen.
+ */
+actual fun changeLanguageNative(code: String) {
+    val tag = if (code == "id-ID") "id-ID" else code
+    platform.Foundation.NSUserDefaults.standardUserDefaults.setObject(listOf(tag), forKey = "AppleLanguages")
+    platform.Foundation.NSUserDefaults.standardUserDefaults.synchronize()
+}

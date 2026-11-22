@@ -78,6 +78,8 @@ import platform.Foundation.NSURL
 import platform.darwin.NSObjectProtocol
 import kotlin.math.pow
 import kotlin.random.Random
+import com.maxrave.data.native.dsp.simp_dj_set
+import com.maxrave.data.native.dsp.simp_level
 import com.maxrave.data.native.dsp.simp_normalize_set
 import kotlin.time.TimeSource
 
@@ -111,6 +113,9 @@ class AvPlayerAdapter(
     private var currentSlot = 0
 
     private var crossfadeEnabled = false
+
+    /** DJ mode: low-pass sweep on the outgoing track, high-pass on the incoming (C filter per tap slot). */
+    private var djCrossfadeEnabled = false
     private var crossfadeDurationMs = 5_000
     private var skipCrossfadeInAlbum = false
     private var userVolume = 1f
@@ -216,6 +221,8 @@ class AvPlayerAdapter(
         coroutineScope.launch { dataStoreManager.crossfadeEnabled.collect { crossfadeEnabled = it == DataStoreManager.TRUE } }
         coroutineScope.launch { dataStoreManager.crossfadeDuration.collect { crossfadeDurationMs = it } }
         coroutineScope.launch { dataStoreManager.crossfadeSkipAlbum.collect { skipCrossfadeInAlbum = it == DataStoreManager.TRUE } }
+        coroutineScope.launch { dataStoreManager.crossfadeDjMode.collect { djCrossfadeEnabled = it == DataStoreManager.TRUE } }
+        coroutineScope.launch { dataStoreManager.skipSilent.collect { skipSilentEnabled = it == DataStoreManager.TRUE } }
     }
 
     // ---------------------------------------------------------------------------------------
@@ -785,6 +792,8 @@ class AvPlayerAdapter(
 
     /** Video URL plus audio URL for a music video, as the desktop adapter merges them. */
     private suspend fun resolveVideo(videoId: String): Pair<String, String>? {
+        // A downloaded music video already carries its sound: same file for picture and audio.
+        downloadedVideoPath(videoId)?.let { return it to it }
         val video =
             runCatching { streamRepository.getStream(dataStoreManager, videoId, isDownloading = false, isVideo = true).lastOrNull() }
                 .getOrNull() ?: return null
@@ -1002,6 +1011,7 @@ class AvPlayerAdapter(
                     onTrackEnded()
                 }
                 checkStall()
+                checkSilence()
                 maybeStartCrossfade()
                 when (item.status) {
                     AVPlayerItemStatusReadyToPlay ->
@@ -1037,6 +1047,39 @@ class AvPlayerAdapter(
      * Mid-track it is the network. AVPlayer resumes by itself when the connection comes back, but
      * not when the URL has expired meanwhile, so after a while it reloads from where it stopped.
      */
+    /**
+     * Skip silence (iOS): the C tap publishes each buffer's peak. About -50 dBFS for 0.75 s
+     * mid-track jumps 1.5 s ahead; a silent tail in the last 25 s ends the track. Never in the
+     * first 3 s, during a crossfade, or while buffering.
+     */
+    private fun checkSilence() {
+        val now: Double = platform.CoreFoundation.CFAbsoluteTimeGetCurrent()
+        val duration = if (knownDurationMs > 0) knownDurationMs else cachedDuration
+        if (!skipSilentEnabled || state != State.READY || !internalPlayWhenReady || fadingOut != null ||
+            player.timeControlStatus != platform.AVFoundation.AVPlayerTimeControlStatusPlaying ||
+            cachedPosition < 3_000 || duration < 10_000
+        ) {
+            silentSince = null
+            return
+        }
+        if (simp_level() >= 0.003f) {
+            silentSince = null
+            return
+        }
+        val since = silentSince ?: now.also { silentSince = it }
+        val silentFor = now - since
+        if (duration - cachedPosition < 25_000 && silentFor >= 1.0) {
+            silentSince = null
+            onTrackEnded()
+        } else if (silentFor >= 0.75) {
+            silentSince = null
+            seekTo(minOf(cachedPosition + 1_500, duration - 1_000))
+        }
+    }
+
+    private var silentSince: Double? = null
+    private var skipSilentEnabled = false
+
     private fun checkStall() {
         val waiting =
             state == State.READY && internalPlayWhenReady &&
@@ -1153,6 +1196,12 @@ class AvPlayerAdapter(
             val t = step.toDouble() / CROSSFADE_STEPS
             outgoing.volume = (startVolume * kotlin.math.cos(t * PI_HALF)).toFloat()
             incoming.volume = (targetVolume() * kotlin.math.sin(t * PI_HALF)).toFloat()
+            if (djCrossfadeEnabled) {
+                // Same curve as Android: sigmoid in time, exponential in frequency.
+                val p = 1.0 / (1.0 + kotlin.math.exp(-10.0 * (t - 0.5)))
+                simp_dj_set(1 - currentSlot, 1, (20000.0 * (200.0 / 20000.0).pow(p)).toFloat())
+                simp_dj_set(currentSlot, 2, (2000.0 * (20.0 / 2000.0).pow(p)).toFloat())
+            }
         }
         finishCrossfade()
         prefetchNext()
@@ -1173,6 +1222,8 @@ class AvPlayerAdapter(
         crossfadeJob = null
         outgoing.pause()
         outgoing.replaceCurrentItemWithPlayerItem(null)
+        simp_dj_set(0, 0, 20000f)
+        simp_dj_set(1, 0, 20000f)
         player.volume = targetVolume()
         notify { onCrossfadeStateChanged(false) }
     }

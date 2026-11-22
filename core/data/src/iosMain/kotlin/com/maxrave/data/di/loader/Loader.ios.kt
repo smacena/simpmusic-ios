@@ -44,7 +44,7 @@ actual fun loadMediaService() {
                     override suspend fun removeCachedSong(videoId: String) {}
                 }
             }
-            single<DownloadHandler> { IosDownloadHandler(songRepository = get()) }
+            single<DownloadHandler> { IosDownloadHandler(songRepository = get(), dataStoreManager = get()) }
         },
     )
 }
