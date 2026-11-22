@@ -12,5 +12,6 @@ MTAudioProcessingTapRef simp_create_tap(int slot) CF_RETURNS_RETAINED;
 double simp_sample_rate(void);
 float simp_level(void);
 void simp_pitch_set(float ratio);
+void simp_dj_set(int slot, int type, float cutoffHz);
 
 #endif

@@ -376,6 +376,52 @@ static void simp_pitch_process(int slot, int ch, float* data, int frames, float 
     g_ps_phase[slot][ch] = phase;
 }
 
+/* ---------------------------------------------------------------- DJ crossfade filter */
+
+/* DJ-style crossfade (same as Android's CrossfadeFilterAudioProcessor): the outgoing track's
+ * low-pass sweeps 20 kHz -> 200 Hz while the incoming track's high-pass sweeps 2 kHz -> 20 Hz.
+ * The player animates the cutoff per slot; coefficients are rebuilt on the audio thread only when
+ * the cutoff changed. Type 0 = off, 1 = low-pass, 2 = high-pass. */
+static int g_dj_type[SIMP_SLOTS];
+static uint32_t g_dj_cut_bits[SIMP_SLOTS];
+static float g_dj_built_cut[SIMP_SLOTS];
+static int g_dj_built_type[SIMP_SLOTS];
+static double g_dj_c[SIMP_SLOTS][5];
+static double g_dj_z[SIMP_SLOTS][SIMP_CH][2];
+
+void simp_dj_set(int slot, int type, float cutoffHz) {
+    if (slot < 0 || slot >= SIMP_SLOTS) return;
+    uint32_t b; memcpy(&b, &cutoffHz, 4);
+    __atomic_store_n(&g_dj_cut_bits[slot], b, __ATOMIC_RELEASE);
+    int old = __atomic_exchange_n(&g_dj_type[slot], type, __ATOMIC_ACQ_REL);
+    if (old == 0 && type != 0) memset(g_dj_z[slot], 0, sizeof(g_dj_z[slot]));
+}
+
+static void simp_dj_process(int slot, int ch, float* data, int frames, int type) {
+    uint32_t b = __atomic_load_n(&g_dj_cut_bits[slot], __ATOMIC_ACQUIRE);
+    float cut; memcpy(&cut, &b, 4);
+    double rate = g_rate > 0 ? g_rate : 44100.0;
+    if (cut < 10) cut = 10;
+    if (cut > rate * 0.45) cut = (float)(rate * 0.45);
+    if (ch == 0 && (g_dj_built_cut[slot] != cut || g_dj_built_type[slot] != type)) {
+        double w = 2.0 * M_PI * cut / rate, cs = cos(w), alpha = sin(w) / (2.0 * 0.7071);
+        double a0 = 1.0 + alpha, b0, b1, b2;
+        if (type == 1) { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = (1 - cs) / 2; }
+        else { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = (1 + cs) / 2; }
+        g_dj_c[slot][0] = b0 / a0; g_dj_c[slot][1] = b1 / a0; g_dj_c[slot][2] = b2 / a0;
+        g_dj_c[slot][3] = (-2 * cs) / a0; g_dj_c[slot][4] = (1 - alpha) / a0;
+        g_dj_built_cut[slot] = cut; g_dj_built_type[slot] = type;
+    }
+    const double* c = g_dj_c[slot];
+    double* z = g_dj_z[slot][ch];
+    for (int i = 0; i < frames; i++) {
+        double x = data[i], y = c[0] * x + z[0];
+        z[0] = c[1] * x - c[3] * y + z[1];
+        z[1] = c[2] * x - c[4] * y;
+        data[i] = (float)y;
+    }
+}
+
 /* Runs the whole chain over one channel of float samples, in place. Exposed for tests too. */
 void simp_process_channel(int slot, int ch, float* data, int frames) {
     if (slot < 0 || slot >= SIMP_SLOTS || ch < 0 || ch >= SIMP_CH || data == NULL) return;
@@ -389,7 +435,8 @@ void simp_process_channel(int slot, int ch, float* data, int frames) {
         uint32_t b; memcpy(&b, &peak, 4); __atomic_store_n(&g_peak_bits, b, __ATOMIC_RELAXED);
     }
     float ratio = simp_pitch_ratio();
-    if (!eqOn && echo == NULL && rev == NULL && norm == 1.0f && ratio == 1.0f) return;
+    int djType = __atomic_load_n(&g_dj_type[slot], __ATOMIC_ACQUIRE);
+    if (!eqOn && echo == NULL && rev == NULL && norm == 1.0f && ratio == 1.0f && djType == 0) return;
     if (ratio != 1.0f) simp_pitch_process(slot, ch, data, frames, ratio);
 
     float pre = (eqOn ? eq->preamp : 1.0f) * norm;
@@ -410,6 +457,7 @@ void simp_process_channel(int slot, int ch, float* data, int frames) {
     }
     if (echo != NULL) simp_echo_process(echo, slot, ch, data, frames);
     if (rev != NULL) simp_reverb_process(rev, slot, ch, data, frames);
+    if (djType != 0) simp_dj_process(slot, ch, data, frames, djType);
     simp_limit(data, frames);
 }
 

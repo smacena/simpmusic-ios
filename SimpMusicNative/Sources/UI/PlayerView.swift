@@ -22,6 +22,111 @@ struct PlayerView: View {
     @AppStorage("player.style") private var style = "classic"
 
     var body: some View {
+        Group {
+            if style == "expressive" { expressiveLayout } else { standardLayout }
+        }
+        .foregroundStyle(.white)
+        .gesture(DragGesture(minimumDistance: 30).onEnded { if $0.translation.height > 80 { dismiss() } })
+        .onAppear { refresh() }
+        .onChange(of: player.current?.id) { _, _ in refresh() }
+        .modifier(PlayerSheets(showQueue: $showQueue, showLyrics: $showLyrics, addTo: $addTo, showInfo: $showInfo, showSleep: $showSleep, sleepActive: player.sleepDeadline != nil || player.sleepAtEndOfTrack, player: player))
+    }
+
+    /// SimpMusic's Material 3 Expressive Now Playing (NowPlayingContentM3Expressive.kt): tonal
+    /// scheme from the cover, round 44pt top buttons, 28pt-corner artwork card, inline lyric line,
+    /// title row with the like toggle, wavy seek bar, pill transport and the connected group.
+    private var expressiveLayout: some View {
+        let scheme = TonalScheme(seed: artwork.color)
+        return ZStack {
+            scheme.background.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold)).foregroundStyle(scheme.onSurface)
+                            .frame(width: 44, height: 44).background(scheme.surfaceContainerHigh, in: Circle())
+                    }
+                    VStack(spacing: 0) {
+                        Text("TOCANDO AGORA").font(Theme.poppins(14))
+                        Text(player.queueTitle).font(Theme.poppins(12, .medium)).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity)
+                    Menu { moreMenuItems } label: {
+                        Image(systemName: "ellipsis").rotationEffect(.degrees(90)).font(.system(size: 18, weight: .semibold)).foregroundStyle(scheme.onSurface)
+                            .frame(width: 44, height: 44).background(scheme.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+                .padding(.top, 8)
+                Spacer(minLength: 12)
+                Group {
+                    if player.videoMode { cover } else {
+                        // Color.clear fixes the square; the cover only fills it (never widens the layout).
+                        Color.clear
+                            .aspectRatio(1, contentMode: .fit)
+                            .overlay {
+                                AsyncImage(url: player.current?.artworkLarge) { $0.resizable().scaledToFill() } placeholder: { scheme.surfaceContainerHigh }
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    }
+                }
+                Spacer(minLength: 8)
+                lyricLine.multilineTextAlignment(.center).frame(minHeight: 44)
+                Spacer(minLength: 8)
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(player.current?.title ?? "").font(Theme.poppins(20, .bold)).lineLimit(1)
+                        Text(player.current?.artist ?? "").font(Theme.poppins(15)).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                            .onTapGesture { if let a = player.current?.artist { ArtistRouter.shared.open(name: a) } }
+                    }
+                    Spacer()
+                    if let track = player.current {
+                        let liked = library.isFavorite(track)
+                        Button { library.toggleFavorite(track) } label: {
+                            Image(systemName: liked ? "heart.fill" : "heart").font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(liked ? scheme.onPrimaryContainer : scheme.onSurfaceVariant)
+                                .frame(width: 48, height: 48)
+                                .background(liked ? scheme.primaryContainer : scheme.surfaceContainerHigh, in: Circle())
+                                .symbolEffect(.bounce, value: liked)
+                        }
+                    }
+                }
+                WavySeekBar(
+                    fraction: player.duration > 0 ? player.position / player.duration : 0,
+                    isPlaying: player.isPlaying,
+                    active: scheme.primary,
+                    track: scheme.secondaryContainer,
+                    onSeek: { player.seek(to: $0 * player.duration) }
+                )
+                .padding(.top, 15)
+                HStack {
+                    Text(Self.format(player.position))
+                    Spacer()
+                    Text(player.duration > 0 ? Self.format(player.duration) : "--:--")
+                }
+                .font(Theme.poppins(14)).foregroundStyle(.white.opacity(0.7))
+                .offset(y: -8)
+                ExpressiveTransportRow(scheme: scheme, isPlaying: player.isPlaying, loading: player.isLoading,
+                                       onPrev: { player.previous() }, onPlay: { player.togglePlayPause() }, onNext: { player.next() })
+                    .padding(.top, 8)
+                ConnectedGroup(scheme: scheme, slots: [
+                    .init(icon: "info.circle", action: { showInfo = true }),
+                    .init(icon: "headphones", custom: AnyView(ZStack {
+                        Image(systemName: "headphones").font(.system(size: 19, weight: .medium)).foregroundStyle(scheme.onSurfaceVariant)
+                        RoutePicker().opacity(0.02)
+                    }), action: nil),
+                    .init(icon: "shuffle", active: player.shuffleOn, action: { player.toggleShuffle() }),
+                    .init(icon: player.repeatMode == 2 ? "repeat.1" : "repeat", active: player.repeatMode != 0, action: { player.cycleRepeat() }),
+                    .init(icon: "text.badge.plus", action: { addTo = player.current }),
+                    .init(icon: "list.bullet", action: { showQueue = true }),
+                    .init(icon: "quote.bubble", action: { showLyrics = true }),
+                ])
+                .padding(.top, 16).padding(.bottom, 10)
+            }
+            .padding(.horizontal, 20)
+        }
+        .animation(.easeInOut(duration: 0.8), value: artwork.color)
+    }
+
+    private var standardLayout: some View {
         ZStack {
             background.ignoresSafeArea()
             VStack(spacing: 0) {
@@ -44,19 +149,6 @@ struct PlayerView: View {
             }
             .padding(.horizontal, 20)
         }
-        .foregroundStyle(.white)
-        .gesture(DragGesture(minimumDistance: 30).onEnded { if $0.translation.height > 80 { dismiss() } })
-        .onAppear { refresh() }
-        .onChange(of: player.current?.id) { _, _ in refresh() }
-        .sheet(isPresented: $showQueue) { QueueView().preferredColorScheme(.dark) }
-        .fullScreenCover(isPresented: $showLyrics) { LyricsView() }
-        .sheet(item: $addTo) { AddToPlaylistSheet(track: $0).presentationDetents([.medium, .large]).preferredColorScheme(.dark) }
-        .sheet(isPresented: $showInfo) { SongInfoView().presentationDetents([.medium]).preferredColorScheme(.dark) }
-        .confirmationDialog("Temporizador de sono", isPresented: $showSleep, titleVisibility: .visible) {
-            ForEach([5, 15, 30, 45, 60], id: \.self) { m in Button("\(m) minutos") { player.setSleepTimer(minutes: m) } }
-            Button("Fim da música") { player.setSleepTimerEndOfTrack() }
-            if player.sleepDeadline != nil || player.sleepAtEndOfTrack { Button("Desligar", role: .destructive) { player.cancelSleepTimer() } }
-        }
     }
 
     private func refresh() {
@@ -73,39 +165,42 @@ struct PlayerView: View {
                 Text(player.queueTitle).font(Theme.poppins(17, .bold)).lineLimit(1)
             }
             Spacer()
-            Menu {
-                if let track = player.current {
-                    Button { downloads.download(track) } label: {
-                        Label(Downloads.localFile(for: track.id) != nil ? "Baixada" : "Baixar", systemImage: "arrow.down.circle")
-                    }
-                    .disabled(Downloads.localFile(for: track.id) != nil)
-                    Button { library.toggleFavorite(track) } label: {
-                        Label(library.isFavorite(track) ? "Remover dos favoritos" : "Favoritar", systemImage: "heart")
-                    }
-                    Button { player.startRadio(track) } label: { Label("Iniciar rádio", systemImage: "dot.radiowaves.left.and.right") }
-                    Button { ArtistRouter.shared.open(name: track.artist) } label: { Label("Ir ao artista", systemImage: "person.circle") }
-                }
-                Button { showSleep = true } label: { Label(sleepLabel, systemImage: "moon.zzz") }
-                Menu {
-                    ForEach([0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
-                        Button { player.setRate(Float(rate)) } label: {
-                            if player.rate == Float(rate) { Label("\(rate, specifier: "%.2g")x", systemImage: "checkmark") } else { Text("\(rate, specifier: "%.2g")x") }
-                        }
-                    }
-                } label: { Label("Velocidade", systemImage: "speedometer") }
-                Menu {
-                    ForEach([-4, -3, -2, -1, 0, 1, 2, 3, 4], id: \.self) { st in
-                        Button { player.setPitch(st) } label: {
-                            let name = st == 0 ? "Original" : (st > 0 ? "+\(st)" : "\(st)")
-                            if player.pitchSemitones == st { Label(name, systemImage: "checkmark") } else { Text(name) }
-                        }
-                    }
-                } label: { Label("Tom", systemImage: "tuningfork") }
-                if let track = player.current {
-                    ShareLink(item: URL(string: "https://music.youtube.com/watch?v=\(track.id)")!) { Label("Compartilhar", systemImage: "square.and.arrow.up") }
-                }
-            } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)).font(.system(size: 20, weight: .bold)).frame(width: 44, height: 44) }
+            Menu { moreMenuItems } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)).font(.system(size: 20, weight: .bold)).frame(width: 44, height: 44) }
         }
+    }
+
+    @ViewBuilder
+    private var moreMenuItems: some View {
+            if let track = player.current {
+                Button { downloads.download(track) } label: {
+                    Label(Downloads.localFile(for: track.id) != nil ? "Baixada" : "Baixar", systemImage: "arrow.down.circle")
+                }
+                .disabled(Downloads.localFile(for: track.id) != nil)
+                Button { library.toggleFavorite(track) } label: {
+                    Label(library.isFavorite(track) ? "Remover dos favoritos" : "Favoritar", systemImage: "heart")
+                }
+                Button { player.startRadio(track) } label: { Label("Iniciar rádio", systemImage: "dot.radiowaves.left.and.right") }
+                Button { ArtistRouter.shared.open(name: track.artist) } label: { Label("Ir ao artista", systemImage: "person.circle") }
+            }
+            Button { showSleep = true } label: { Label(sleepLabel, systemImage: "moon.zzz") }
+            Menu {
+                ForEach([0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
+                    Button { player.setRate(Float(rate)) } label: {
+                        if player.rate == Float(rate) { Label("\(rate, specifier: "%.2g")x", systemImage: "checkmark") } else { Text("\(rate, specifier: "%.2g")x") }
+                    }
+                }
+            } label: { Label("Velocidade", systemImage: "speedometer") }
+            Menu {
+                ForEach([-4, -3, -2, -1, 0, 1, 2, 3, 4], id: \.self) { st in
+                    Button { player.setPitch(st) } label: {
+                        let name = st == 0 ? "Original" : (st > 0 ? "+\(st)" : "\(st)")
+                        if player.pitchSemitones == st { Label(name, systemImage: "checkmark") } else { Text(name) }
+                    }
+                }
+            } label: { Label("Tom", systemImage: "tuningfork") }
+            if let track = player.current {
+                ShareLink(item: URL(string: "https://music.youtube.com/watch?v=\(track.id)")!) { Label("Compartilhar", systemImage: "square.and.arrow.up") }
+            }
     }
 
     private var sleepLabel: String {
@@ -382,5 +477,30 @@ struct QueueView: View {
             .navigationTitle("Fila")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+
+/// The player's sheets, shared by every Now Playing style.
+struct PlayerSheets: ViewModifier {
+    @Binding var showQueue: Bool
+    @Binding var showLyrics: Bool
+    @Binding var addTo: Track?
+    @Binding var showInfo: Bool
+    @Binding var showSleep: Bool
+    let sleepActive: Bool
+    let player: PlayerEngine
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: $showQueue) { QueueView().preferredColorScheme(.dark) }
+            .fullScreenCover(isPresented: $showLyrics) { LyricsView() }
+            .sheet(item: $addTo) { AddToPlaylistSheet(track: $0).presentationDetents([.medium, .large]).preferredColorScheme(.dark) }
+            .sheet(isPresented: $showInfo) { SongInfoView().presentationDetents([.medium]).preferredColorScheme(.dark) }
+            .confirmationDialog("Temporizador de sono", isPresented: $showSleep, titleVisibility: .visible) {
+                ForEach([5, 15, 30, 45, 60], id: \.self) { m in Button("\(m) minutos") { player.setSleepTimer(minutes: m) } }
+                Button("Fim da música") { player.setSleepTimerEndOfTrack() }
+                if sleepActive { Button("Desligar", role: .destructive) { player.cancelSleepTimer() } }
+            }
     }
 }
