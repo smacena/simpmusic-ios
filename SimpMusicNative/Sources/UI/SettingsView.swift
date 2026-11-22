@@ -22,6 +22,7 @@ struct SettingsView: View {
     @AppStorage("content.explicit") private var explicitAllowed = true
     @AppStorage("video.auto") private var videoAuto = false
     @AppStorage("radio.audioOnly") private var radioAudioOnly = false
+    @AppStorage("history.google") private var historyGoogle = false
     @AppStorage("player.saveModes") private var saveModes = true
     @AppStorage("history.tracking") private var historyTracking = true
     @State private var confirmClearHistory = false
@@ -108,6 +109,9 @@ struct SettingsView: View {
                 Toggle("Tocar o vídeo quando a faixa for videoclipe", isOn: $videoAuto)
                 Toggle("Rádio só com áudio (sem videoclipes)", isOn: $radioAudioOnly)
                 Toggle("Salvar aleatório e repetir", isOn: $saveModes)
+                if account.isSignedIn {
+                    Toggle("Enviar histórico ao YouTube (melhora as recomendações)", isOn: $historyGoogle)
+                }
             }
             Section("Histórico de escuta") {
                 Toggle("Registrar o que ouço (só neste aparelho)", isOn: $historyTracking)

@@ -57,7 +57,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Vídeo em vez de áudio | [x] | [x] |
 | Rádio só áudio | [x] | [x] |
 | Sincronizar seguidos com YouTube | [x] | [ ] |
-| Enviar histórico ao Google | [x] | [ ] |
+| Enviar histórico ao Google | [x] | [x] |
 | Conteúdo explícito | [x] | [x] |
 | Playlists do YouTube offline | [x] | [ ] |
 | Juntar curtidas locais e do YouTube | [x] | [ ] |

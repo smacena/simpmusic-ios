@@ -471,6 +471,9 @@ final class PlayerEngine: ObservableObject {
         if let track = current { Library.shared.addRecent(track) }
         // Settings: "Vídeo em vez de áudio" plays a music video's picture when the track is one.
         if UserDefaults.standard.bool(forKey: "video.auto"), current?.isVideo == true, !videoMode { toggleVideo() }
+        if UserDefaults.standard.bool(forKey: "history.google"), let id = current?.id {
+            Task.detached(priority: .utility) { await InnerTube.shared.reportPlayback(videoId: id) }
+        }
         persistQueue()
         AppLog.i("Player", "playing \(current?.id ?? "?") dur=\(Int(duration))s")
     }

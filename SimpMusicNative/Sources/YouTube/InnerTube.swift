@@ -687,6 +687,46 @@ actor InnerTube {
         return (title, items)
     }
 
+    // MARK: Watch history
+
+    /// Settings → "Enviar histórico ao Google": the same pings YouTube Music's web player sends
+    /// (YouTube.initPlayback in the original): playback, first watchtime, ATR after 5 s, then a
+    /// second watchtime — which puts the song in the account's history and feeds recommendations.
+    func reportPlayback(videoId: String, playlistId: String? = nil) async {
+        guard Account.authHeaders() != nil,
+              let json = try? await post("player", client: Self.webRemix, body: ["videoId": videoId]),
+              let tracking = json["playbackTracking"] as? [String: Any] else { return }
+        func base(_ key: String) -> String? { (tracking[key] as? [String: Any])?["baseUrl"] as? String }
+        guard let playback = base("videostatsPlaybackUrl"), let watchtime = base("videostatsWatchtimeUrl") else { return }
+        let alphabet = Array("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+        let cpn = String((0 ..< 16).map { _ in alphabet.randomElement()! })
+        func ping(_ urlString: String, _ extra: [String: String] = [:], method: String = "GET") async -> Int {
+            guard var comps = URLComponents(string: urlString) else { return 0 }
+            var items = comps.queryItems ?? []
+            items += [URLQueryItem(name: "ver", value: "2"), URLQueryItem(name: "c", value: "WEB_REMIX"), URLQueryItem(name: "cpn", value: cpn)]
+            items += extra.map { URLQueryItem(name: $0.key, value: $0.value) }
+            if let playlistId {
+                items += [URLQueryItem(name: "list", value: playlistId), URLQueryItem(name: "referrer", value: "https://music.youtube.com/playlist?list=\(playlistId)")]
+            }
+            comps.queryItems = items
+            guard let url = comps.url else { return 0 }
+            var req = URLRequest(url: url)
+            req.httpMethod = method
+            let now = String(Int(Date().timeIntervalSince1970 * 1000))
+            req.setValue(now, forHTTPHeaderField: "X-Goog-Event-Time")
+            req.setValue(now, forHTTPHeaderField: "X-Goog-Request-Time")
+            req.setValue(Self.webRemix.userAgent, forHTTPHeaderField: "User-Agent")
+            for (k, v) in Account.authHeaders() ?? [:] { req.setValue(v, forHTTPHeaderField: k) }
+            return ((try? await session.data(for: req))?.1 as? HTTPURLResponse)?.statusCode ?? 0
+        }
+        guard await ping(playback) == 204, await ping(watchtime, ["st": "0", "et": "5.54"]) == 204 else { return }
+        try? await Task.sleep(for: .seconds(5))
+        if let atr = base("atrUrl") { _ = await ping(atr, method: "POST") }
+        try? await Task.sleep(for: .milliseconds(500))
+        let second = String(format: "%.2f", 12 + Double.random(in: 0 ..< 1))
+        _ = await ping(watchtime, ["st": "0,5.54", "et": "5.54,\(second)"])
+    }
+
     // MARK: Lyrics tab
 
     /// The plain lyrics YouTube Music shows in its "Lyrics" tab (next → MPLY browse id → browse).
