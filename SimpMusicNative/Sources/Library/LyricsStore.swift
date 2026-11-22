@@ -7,6 +7,7 @@ final class LyricsStore: ObservableObject {
     static let shared = LyricsStore()
     @Published private(set) var lines: [LyricLine]?
     @Published private(set) var trackId: String?
+    @Published private(set) var source: LyricsSource?
     /// Translated lines keyed by their time, when a community translation exists.
     @Published private(set) var translation: [Double: String] = [:]
 
@@ -20,12 +21,14 @@ final class LyricsStore: ObservableObject {
         guard let track, track.id != trackId else { return }
         trackId = track.id
         lines = nil
+        source = nil
         translation = [:]
         task?.cancel()
         task = Task {
-            let result = await Lyrics.fetch(for: track, duration: duration) ?? []
+            let result = await Lyrics.fetch(for: track, duration: duration)
             guard !Task.isCancelled, self.trackId == track.id else { return }
-            self.lines = result
+            self.lines = result?.lines ?? []
+            self.source = result?.source
             guard Self.translateEnabled, let language = Locale.current.language.languageCode?.identifier,
                   let translated = await Lyrics.translation(videoId: track.id, language: language),
                   self.trackId == track.id else { return }
@@ -43,8 +46,21 @@ final class LyricsStore: ObservableObject {
 
     var isSynced: Bool { lines?.first.map { $0.time >= 0 } ?? false }
 
+    /// Bluetooth delay compensation (ms, positive = lyrics later), applied when reading only.
+    static var offsetMs: Int {
+        get { UserDefaults.standard.integer(forKey: "lyrics.offsetMs") }
+        set { UserDefaults.standard.set(newValue, forKey: "lyrics.offsetMs") }
+    }
+
     func currentIndex(at position: Double) -> Int? {
         guard let lines, isSynced else { return nil }
-        return lines.lastIndex { $0.time <= position }
+        let heard = position - Double(Self.offsetMs) / 1000
+        return lines.lastIndex { $0.time <= heard }
+    }
+
+    /// Forces a reload (after changing the preferred source).
+    func reload(for track: Track?, duration: Double) {
+        trackId = nil
+        load(for: track, duration: duration)
     }
 }

@@ -463,6 +463,36 @@ actor InnerTube {
         return ArtistPage(name: name, thumbnail: thumb, songs: songs, shelves: shelves)
     }
 
+    // MARK: Lyrics tab
+
+    /// The plain lyrics YouTube Music shows in its "Lyrics" tab (next → MPLY browse id → browse).
+    func youtubeLyrics(for videoId: String) async -> String? {
+        guard let next = try? await post("next", client: Self.webRemix, body: ["videoId": videoId]) else { return nil }
+        var browseId: String?
+        func findTab(_ node: Any) {
+            guard browseId == nil else { return }
+            if let dict = node as? [String: Any] {
+                if let id = dict["browseId"] as? String, id.hasPrefix("MPLY") { browseId = id; return }
+                for v in dict.values { findTab(v) }
+            } else if let a = node as? [Any] { for v in a { findTab(v) } }
+        }
+        findTab(next)
+        guard let browseId, let page = try? await post("browse", client: Self.webRemix, body: ["browseId": browseId]) else { return nil }
+        var text: String?
+        func findShelf(_ node: Any) {
+            guard text == nil else { return }
+            if let dict = node as? [String: Any] {
+                if let shelf = dict["musicDescriptionShelfRenderer"] as? [String: Any],
+                   let runs = (shelf["description"] as? [String: Any])?["runs"] as? [[String: Any]] {
+                    text = runs.compactMap { $0["text"] as? String }.joined(); return
+                }
+                for v in dict.values { findShelf(v) }
+            } else if let a = node as? [Any] { for v in a { findShelf(v) } }
+        }
+        findShelf(page)
+        return text?.isEmpty == false ? text : nil
+    }
+
     // MARK: Radio (what plays after a song)
 
     /// The radio queue YouTube Music builds from a song ("next" endpoint, RDAMVM playlist).

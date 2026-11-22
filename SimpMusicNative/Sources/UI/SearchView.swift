@@ -93,5 +93,73 @@ struct TrackRow: View {
             if let d = track.durationText { Text(d).font(Theme.bodySmall).foregroundStyle(Theme.body) }
         }
         .contentShape(Rectangle())
+        .contextMenu { TrackMenuItems(track: track) }
     }
+}
+
+/// The per-song actions (long press on any song, or the ⋯ button in the player).
+struct TrackMenuItems: View {
+    @EnvironmentObject private var player: PlayerEngine
+    @EnvironmentObject private var library: Library
+    @EnvironmentObject private var downloads: Downloads
+    let track: Track
+
+    var body: some View {
+        Button { player.playNext(track) } label: { Label("Tocar a seguir", systemImage: "text.insert") }
+        Button { player.addToQueue(track) } label: { Label("Adicionar à fila", systemImage: "text.append") }
+        Button { player.startRadio(track) } label: { Label("Iniciar rádio", systemImage: "dot.radiowaves.left.and.right") }
+        Button { ArtistRouter.shared.open(name: track.artist) } label: { Label("Ir ao artista", systemImage: "person.circle") }
+        Button { library.toggleFavorite(track) } label: {
+            Label(library.isFavorite(track) ? "Remover dos favoritos" : "Favoritar", systemImage: library.isFavorite(track) ? "heart.slash" : "heart")
+        }
+        Button { AddToPlaylistRouter.shared.track = track } label: { Label("Adicionar à playlist", systemImage: "text.badge.plus") }
+        if Downloads.localFile(for: track.id) == nil {
+            Button { downloads.download(track) } label: { Label("Baixar", systemImage: "arrow.down.circle") }
+        }
+        ShareLink(item: URL(string: "https://music.youtube.com/watch?v=\(track.id)")!) { Label("Compartilhar", systemImage: "square.and.arrow.up") }
+    }
+}
+
+/// Opens an artist page from anywhere (songs carry only the artist's name).
+@MainActor final class ArtistRouter: ObservableObject {
+    static let shared = ArtistRouter()
+    struct Target: Identifiable { let id: String; let name: String }
+    @Published var target: Target?
+
+    func open(name: String) {
+        let first = name.components(separatedBy: CharacterSet(charactersIn: ",&•")).first?.trimmingCharacters(in: .whitespaces) ?? name
+        Task {
+            if let hit = try? await InnerTube.shared.searchCollections(first, kind: .artists).first {
+                target = Target(id: hit.browseId, name: hit.title)
+            }
+        }
+    }
+}
+
+@MainActor final class AddToPlaylistRouter: ObservableObject {
+    static let shared = AddToPlaylistRouter()
+    @Published var track: Track?
+}
+
+
+/// Presents the artist page / add-to-playlist sheet requested from a song menu. Attached to the
+/// root and to the full-screen player; only the topmost presenter is enabled.
+struct RouterSheets: ViewModifier {
+    @ObservedObject private var artist = ArtistRouter.shared
+    @ObservedObject private var add = AddToPlaylistRouter.shared
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: enabled ? $artist.target : .constant(nil)) { t in
+                NavigationStack { ArtistView(browseId: t.id, fallbackName: t.name) }.preferredColorScheme(.dark)
+            }
+            .sheet(item: enabled ? $add.track : .constant(nil)) { track in
+                AddToPlaylistSheet(track: track).presentationDetents([.medium, .large]).preferredColorScheme(.dark)
+            }
+    }
+}
+
+extension View {
+    func routerSheets(enabled: Bool = true) -> some View { modifier(RouterSheets(enabled: enabled)) }
 }

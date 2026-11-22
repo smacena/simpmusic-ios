@@ -28,7 +28,8 @@ struct RootView: View {
             .padding(.bottom, 4)
         }
         .tint(Theme.seed)
-        .fullScreenCover(isPresented: $showPlayer) { PlayerView() }
+        .routerSheets(enabled: !showPlayer)
+        .fullScreenCover(isPresented: $showPlayer) { PlayerView().routerSheets() }
         .alert("Erro", isPresented: Binding(get: { player.errorMessage != nil }, set: { if !$0 { player.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(player.errorMessage ?? "") }

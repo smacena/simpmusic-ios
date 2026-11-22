@@ -13,6 +13,9 @@ struct SettingsView: View {
     @State private var message: String?
     @State private var romanize = Romanizer.enabled
     @State private var translate = LyricsStore.translateEnabled
+    @State private var lyricsSource = LyricsSource.preferred
+    @AppStorage("lyrics.style") private var lyricsStyle = "classic"
+    @AppStorage("lyrics.offsetMs") private var lyricsOffset = 0
 
     var body: some View {
         Form {
@@ -50,6 +53,19 @@ struct SettingsView: View {
                     .onChange(of: romanize) { _, value in Romanizer.enabled = value }
                 Toggle("Mostrar tradução da comunidade", isOn: $translate)
                     .onChange(of: translate) { _, value in LyricsStore.translateEnabled = value }
+                Picker("Fonte preferida", selection: $lyricsSource) {
+                    ForEach(LyricsSource.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .onChange(of: lyricsSource) { _, value in
+                    LyricsSource.preferred = value
+                    LyricsStore.shared.reload(for: player.current, duration: player.duration)
+                }
+                Picker("Estilo", selection: $lyricsStyle) {
+                    Text("Classic").tag("classic")
+                    Text("Apple Music").tag("apple")
+                }
+                Stepper("Atraso: \(lyricsOffset) ms", value: $lyricsOffset, in: -3000 ... 3000, step: 100)
+                Text("Use o atraso se a letra adiantar no fone Bluetooth.").font(.caption).foregroundStyle(.secondary)
             }
             Section("Equalizador") {
                 Toggle("Ativado", isOn: $effects.eqEnabled)

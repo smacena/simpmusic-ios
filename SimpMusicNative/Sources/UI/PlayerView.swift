@@ -73,6 +73,8 @@ struct PlayerView: View {
                     Button { library.toggleFavorite(track) } label: {
                         Label(library.isFavorite(track) ? "Remover dos favoritos" : "Favoritar", systemImage: "heart")
                     }
+                    Button { player.startRadio(track) } label: { Label("Iniciar rádio", systemImage: "dot.radiowaves.left.and.right") }
+                    Button { ArtistRouter.shared.open(name: track.artist) } label: { Label("Ir ao artista", systemImage: "person.circle") }
                 }
                 Button { showSleep = true } label: { Label(sleepLabel, systemImage: "moon.zzz") }
                 Menu {
@@ -253,12 +255,18 @@ struct QueueView: View {
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
-                List(Array(player.queue.enumerated()), id: \.offset) { offset, track in
-                    Button { player.jump(to: offset) } label: { TrackRow(track: track, highlighted: offset == player.index) }
-                        .buttonStyle(.plain)
-                        .listRowBackground(Theme.background)
-                        .id(offset)
+                List {
+                    ForEach(Array(player.queue.enumerated()), id: \.offset) { offset, track in
+                        Button { player.jump(to: offset) } label: { TrackRow(track: track, highlighted: offset == player.index) }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Theme.background)
+                            .id(offset)
+                            .deleteDisabled(offset == player.index)
+                    }
+                    .onMove { player.moveQueue(from: $0, to: $1) }
+                    .onDelete { player.removeFromQueue(at: $0) }
                 }
+                .environment(\.editMode, .constant(.active))
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .background(Theme.background)

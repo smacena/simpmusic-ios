@@ -188,6 +188,49 @@ final class PlayerEngine: ObservableObject {
 
     func cycleRepeat() { repeatMode = (repeatMode + 1) % 3 }
 
+    // MARK: Queue editing
+
+    /// Inserts [track] right after the current song (or starts it when nothing plays).
+    func playNext(_ track: Track) {
+        guard !queue.isEmpty else { play([track]); return }
+        queue.removeAll { $0.id == track.id && $0.id != current?.id }
+        queue.insert(track, at: min(index + 1, queue.count))
+        prefetched.removeAll(); prefetchNext(); persistQueue()
+    }
+
+    func addToQueue(_ track: Track) {
+        guard !queue.isEmpty else { play([track]); return }
+        queue.append(track); persistQueue()
+    }
+
+    /// Reorders the upcoming songs; offsets are relative to the whole queue.
+    func moveQueue(from source: IndexSet, to destination: Int) {
+        let playing = current
+        queue.move(fromOffsets: source, toOffset: destination)
+        if let playing, let i = queue.firstIndex(where: { $0.id == playing.id }) { index = i }
+        prefetched.removeAll(); prefetchNext(); persistQueue()
+    }
+
+    func removeFromQueue(at offsets: IndexSet) {
+        let playing = current
+        let filtered = offsets.filter { $0 != index }
+        guard !filtered.isEmpty else { return }
+        queue.remove(atOffsets: IndexSet(filtered))
+        if let playing, let i = queue.firstIndex(where: { $0.id == playing.id }) { index = i }
+        prefetched.removeAll(); prefetchNext(); persistQueue()
+    }
+
+    /// Replaces the queue with YouTube Music's radio for [track].
+    func startRadio(_ track: Track) {
+        play([track], title: "Rádio: \(track.title)")
+        Task { [weak self] in
+            let more = (try? await InnerTube.shared.radio(for: track.id)) ?? []
+            guard let self, self.current?.id == track.id else { return }
+            self.queue.append(contentsOf: more.filter { $0.id != track.id })
+            self.prefetchNext(); self.persistQueue()
+        }
+    }
+
     // MARK: Music video
 
     /// The music video's picture: a muted video-only player kept in step with the audio player,
