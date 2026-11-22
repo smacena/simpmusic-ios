@@ -18,20 +18,29 @@ struct PlayerView: View {
     @State private var showSleep = false
     @State private var addTo: Track?
 
+    /// "classic" (SimpMusic), "expressive" (Material 3 Expressive tonal pills) or "apple" (Apple Music).
+    @AppStorage("player.style") private var style = "classic"
+
     var body: some View {
         ZStack {
-            LinearGradient(colors: [artwork.color, artwork.color.opacity(0.55), Theme.background], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            background.ignoresSafeArea()
             VStack(spacing: 0) {
                 topBar
                 Spacer(minLength: 12)
                 cover
                 Spacer(minLength: 12)
-                lyricLine
+                if style != "apple" { lyricLine }
                 titleRow.padding(.top, 14)
                 scrubber.padding(.top, 18)
-                transport.padding(.top, 14)
-                bottomRow.padding(.top, 18).padding(.bottom, 10)
+                Group {
+                    switch style {
+                    case "expressive": expressiveTransport
+                    case "apple": appleTransport
+                    default: transport
+                    }
+                }
+                .padding(.top, 14)
+                (style == "apple" ? AnyView(appleBottomRow) : AnyView(bottomRow)).padding(.top, 18).padding(.bottom, 10)
             }
             .padding(.horizontal, 20)
         }
@@ -162,18 +171,108 @@ struct PlayerView: View {
         VStack(spacing: 6) {
             Slider(
                 value: Binding(get: { scrubbing ?? player.position }, set: { scrubbing = $0 }),
-                in: 0 ... max(player.duration, 1),
+                in: 0 ... max(player.duration, player.position, 1),
                 onEditingChanged: { editing in if !editing, let t = scrubbing { player.seek(to: t); scrubbing = nil } }
             )
             .tint(.white)
             HStack {
                 Text(Self.format(scrubbing ?? player.position))
                 Spacer()
-                Text(Self.format(player.duration))
+                Text(player.duration > 0 ? Self.format(player.duration) : "--:--")
             }
             .font(Theme.poppins(14))
             .foregroundStyle(.white.opacity(0.7))
         }
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        switch style {
+        case "apple":
+            // Color.clear sizes the layer to the screen; the cover only fills it (never widens it).
+            Color.clear
+                .overlay {
+                    AsyncImage(url: player.current?.artworkLarge) { $0.resizable().scaledToFill() } placeholder: { artwork.color }
+                        .blur(radius: 60).scaleEffect(1.4)
+                }
+                .overlay(Color.black.opacity(0.35))
+                .clipped()
+        case "expressive":
+            ZStack {
+                artwork.color
+                LinearGradient(colors: [.clear, Theme.background.opacity(0.85)], startPoint: .center, endPoint: .bottom)
+            }
+        default:
+            LinearGradient(colors: [artwork.color, artwork.color.opacity(0.55), Theme.background], startPoint: .top, endPoint: .bottom)
+        }
+    }
+
+    /// Material 3 Expressive: shuffle / prev / big play / next / repeat as connected tonal pills.
+    private var expressiveTransport: some View {
+        HStack(spacing: 8) {
+            pill(width: 56, tint: player.shuffleOn) { player.toggleShuffle() } label: { Image(systemName: "shuffle") }
+            pill(width: 64) { player.previous() } label: { Image(systemName: "backward.fill") }
+            Button { player.togglePlayPause() } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: player.isPlaying ? 28 : 40).fill(Color.white)
+                    if player.isLoading { ProgressView().tint(.black) } else {
+                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 30)).foregroundStyle(artwork.color)
+                    }
+                }
+                .frame(maxWidth: .infinity).frame(height: 80)
+                .animation(.spring(response: 0.35, dampingFraction: 0.6), value: player.isPlaying)
+            }
+            pill(width: 64) { player.next() } label: { Image(systemName: "forward.fill") }
+            pill(width: 56, tint: player.repeatMode != 0) { player.cycleRepeat() } label: {
+                Image(systemName: player.repeatMode == 2 ? "repeat.1" : "repeat")
+            }
+        }
+        .font(.system(size: 22, weight: .semibold))
+    }
+
+    private func pill<L: View>(width: CGFloat, tint: Bool = false, action: @escaping () -> Void, @ViewBuilder label: () -> L) -> some View {
+        Button(action: action) {
+            label()
+                .foregroundStyle(tint ? artwork.color : .white)
+                .frame(width: width, height: 80)
+                .background(tint ? Color.white : Color.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 22))
+        }
+    }
+
+    /// Apple Music: plain glyphs, no circle, generous spacing.
+    private var appleTransport: some View {
+        HStack {
+            Spacer()
+            Button { player.previous() } label: { Image(systemName: "backward.fill").font(.system(size: 36)) }
+            Spacer()
+            Button { player.togglePlayPause() } label: {
+                Group {
+                    if player.isLoading { ProgressView().tint(.white) } else {
+                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 48))
+                    }
+                }
+                .frame(width: 70, height: 70)
+            }
+            Spacer()
+            Button { player.next() } label: { Image(systemName: "forward.fill").font(.system(size: 36)) }
+            Spacer()
+        }
+    }
+
+    private var appleBottomRow: some View {
+        HStack {
+            Button { showLyrics = true } label: { Image(systemName: "quote.bubble") }
+            Spacer()
+            RoutePicker().frame(width: 30, height: 30)
+            Spacer()
+            Button { player.toggleVideo() } label: {
+                Image(systemName: player.videoMode ? "music.note" : "play.rectangle").foregroundStyle(player.videoMode ? Theme.seed : .white)
+            }
+            Spacer()
+            Button { showQueue = true } label: { Image(systemName: "list.bullet") }
+        }
+        .font(.system(size: 22, weight: .regular))
+        .padding(.horizontal, 30)
     }
 
     private var transport: some View {

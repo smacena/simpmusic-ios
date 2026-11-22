@@ -48,14 +48,13 @@ struct HomeView: View {
                     .frame(width: 44, height: 44)
                     .background(Theme.surfaceHigh, in: Circle())
             }
-            chipButton("Todos", 0)
-            chipButton("Mood", 1)
-            chipButton("Charts", 2)
-            Spacer()
-            Button { Task { await load() } } label: {
-                Image(systemName: "plus").font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .overlay(Circle().stroke(Color.white.opacity(0.35)))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    chipButton("Todos", 0)
+                    chipButton("Mood", 1)
+                    chipButton("Charts", 2)
+                }
+                .padding(1)
             }
             Button { showSettings = true } label: {
                 Image(systemName: "gearshape.fill").font(.system(size: 22)).foregroundStyle(.white).frame(width: 36, height: 36)
@@ -178,7 +177,7 @@ struct CollectionView: View {
                             Label("Tocar", systemImage: "play.fill").font(Theme.poppins(18, .medium)).foregroundStyle(.black)
                                 .frame(width: 140, height: 52).background(Color.white, in: Capsule())
                         }
-                        Button { tracks.forEach { Downloads.shared.download($0) } } label: {
+                        Button { Downloads.shared.downloadAll(tracks) } label: {
                             Image(systemName: "arrow.down.circle.fill").font(.system(size: 22)).foregroundStyle(.white)
                                 .frame(width: 52, height: 52).background(Theme.surfaceHigh, in: Circle())
                         }

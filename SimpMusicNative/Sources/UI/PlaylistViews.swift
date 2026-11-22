@@ -28,6 +28,10 @@ struct LocalPlaylistView: View {
                                 Label("Tocar", systemImage: "play.fill").font(Theme.poppins(18, .medium)).foregroundStyle(.black)
                                     .frame(width: 140, height: 52).background(Color.white, in: Capsule())
                             }
+                            Button { Downloads.shared.downloadAll(playlist.tracks) } label: {
+                                Image(systemName: "arrow.down.circle").font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
+                                    .frame(width: 52, height: 52).background(Theme.surfaceHigh, in: Circle())
+                            }
                         }
                     } else {
                         Text("Adicione músicas pelo botão + no player.").font(Theme.bodyMedium).foregroundStyle(Theme.body)

@@ -88,7 +88,10 @@ final class Library: ObservableObject {
     func isFavorite(_ track: Track) -> Bool { favorites.contains { $0.id == track.id } }
 
     func toggleFavorite(_ track: Track) {
-        if let i = favorites.firstIndex(where: { $0.id == track.id }) { favorites.remove(at: i) } else { favorites.insert(track, at: 0) }
+        if let i = favorites.firstIndex(where: { $0.id == track.id }) { favorites.remove(at: i) } else {
+            favorites.insert(track, at: 0)
+            if UserDefaults.standard.bool(forKey: "download.liked") { Downloads.shared.download(track) }
+        }
         save(favorites, "favorites")
     }
 

@@ -66,6 +66,8 @@ final class PlayerEngine: ObservableObject {
         didSet { UserDefaults.standard.set(skipSilence, forKey: "skipSilence") }
     }
     private var silentTicks = 0
+    private var skipSegments: [ClosedRange<Double>] = []
+    private var segmentsFor: String?
 
     /// Pitch in semitones, independent of speed (C shifter in the tap).
     @Published private(set) var pitchSemitones: Int = UserDefaults.standard.integer(forKey: "pitch.semitones")
@@ -615,6 +617,7 @@ final class PlayerEngine: ObservableObject {
         if duration > 0, position >= duration + 1.5 { trackEnded(); return }
         maybeStartCrossfade()
         checkSilence()
+        checkSegments()
         let waiting = wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate && !isLoading
         if !waiting { stalledSince = nil; return }
         let since = stalledSince ?? Date()
@@ -627,6 +630,21 @@ final class PlayerEngine: ObservableObject {
             stalledSince = nil
             load(startAt: position, forceFresh: true)
         }
+    }
+
+    private func checkSegments() {
+        guard let id = current?.id else { return }
+        if segmentsFor != id {
+            segmentsFor = id
+            skipSegments = []
+            Task { [weak self] in
+                let segs = await SponsorBlock.segments(for: id)
+                if self?.current?.id == id { self?.skipSegments = segs }
+            }
+            return
+        }
+        guard isPlaying, let seg = skipSegments.first(where: { $0.contains(position) && $0.upperBound - position > 1 }) else { return }
+        if seg.upperBound >= duration - 1 { trackEnded() } else { seek(to: seg.upperBound) }
     }
 
     /// Four ticks a second. About -50 dBFS counts as silence; never in the first 3 seconds.

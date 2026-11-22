@@ -6,6 +6,8 @@ struct SettingsView: View {
     @State private var normalize = PlayerEngine.shared.normalizeVolume
     @State private var crossfade = PlayerEngine.shared.crossfadeEnabled
     @State private var skipSilence = PlayerEngine.shared.skipSilence
+    @State private var sponsorBlock = SponsorBlock.enabled
+    @AppStorage("download.liked") private var downloadLiked = false
     @State private var crossfadeSeconds = PlayerEngine.shared.crossfadeSeconds
     @ObservedObject private var account = Account.shared
     @State private var showLogin = false
@@ -17,6 +19,8 @@ struct SettingsView: View {
     @State private var lyricsSource = LyricsSource.preferred
     @AppStorage("lyrics.style") private var lyricsStyle = "classic"
     @AppStorage("quality.audio") private var audioQuality = "high"
+    @AppStorage("player.style") private var playerStyle = "classic"
+    @AppStorage("theme.accent") private var accent = "seed"
     @AppStorage("quality.video") private var videoQuality = 720
     @AppStorage("lyrics.offsetMs") private var lyricsOffset = 0
 
@@ -41,6 +45,17 @@ struct SettingsView: View {
                 }
                 Button("Restaurar backup") { importing = true }
             }
+            Section("Aparência") {
+                Picker("Estilo do player", selection: $playerStyle) {
+                    Text("Classic").tag("classic")
+                    Text("M3 Expressive").tag("expressive")
+                    Text("Apple Music").tag("apple")
+                }
+                Picker("Cor de destaque", selection: $accent) {
+                    ForEach(Theme.accents, id: \.key) { Text($0.name).tag($0.key) }
+                }
+                Text("A cor de destaque vale depois de reabrir o app.").font(.caption).foregroundStyle(.secondary)
+            }
             Section("Qualidade") {
                 Picker("Áudio", selection: $audioQuality) {
                     Text("Alta (AAC 128 kbps)").tag("high")
@@ -53,6 +68,9 @@ struct SettingsView: View {
             Section("Áudio") {
                 Toggle("Normalizar volume", isOn: $normalize)
                     .onChange(of: normalize) { _, value in player.normalizeVolume = value }
+                Toggle("Pular trechos patrocinados (SponsorBlock)", isOn: $sponsorBlock)
+                    .onChange(of: sponsorBlock) { _, value in SponsorBlock.enabled = value }
+                Toggle("Baixar músicas curtidas automaticamente", isOn: $downloadLiked)
                 Toggle("Pular silêncio", isOn: $skipSilence)
                     .onChange(of: skipSilence) { _, value in player.skipSilence = value }
                 Toggle("Crossfade", isOn: $crossfade)

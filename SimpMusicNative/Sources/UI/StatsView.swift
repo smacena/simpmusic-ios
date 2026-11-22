@@ -7,6 +7,7 @@ struct StatsView: View {
     @EnvironmentObject private var player: PlayerEngine
     @ObservedObject private var library = Library.shared
     @State private var range = 0 // 0: 7 days, 1: 30 days, 2: all
+    @State private var showWrapped = false
 
     private var events: [Library.PlayEvent] {
         let days = range == 0 ? 7 : range == 1 ? 30 : 100_000
@@ -23,6 +24,18 @@ struct StatsView: View {
                     Text("Sempre").tag(2)
                 }
                 .pickerStyle(.segmented)
+                Button { showWrapped = true } label: {
+                    HStack {
+                        Image(systemName: "sparkles")
+                        Text("SimpMusic Wrapped").font(Theme.poppins(17, .bold))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundStyle(.white)
+                    .padding(16)
+                    .background(LinearGradient(colors: [Theme.seed.opacity(0.8), .purple.opacity(0.6)], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 14))
+                }
+                .fullScreenCover(isPresented: $showWrapped) { WrappedView() }
                 let list = events
                 if list.isEmpty {
                     Text("Ouça algumas músicas e as estatísticas aparecem aqui.").font(Theme.bodyMedium).foregroundStyle(Theme.body)

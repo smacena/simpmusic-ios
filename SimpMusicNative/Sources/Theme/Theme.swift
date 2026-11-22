@@ -7,7 +7,20 @@ enum Theme {
     static let background = Color(red: 0.07, green: 0.075, blue: 0.08)
     static let surface = Color(red: 0.13, green: 0.14, blue: 0.15)
     static let surfaceHigh = Color(red: 0.18, green: 0.19, blue: 0.2)
-    static let seed = Color(red: 0x8E / 255, green: 0xCA / 255, blue: 0xE6 / 255)
+    /// Accent colour; chosen in Settings → Aparência (read once at launch).
+    static let seed: Color = {
+        let key = UserDefaults.standard.string(forKey: "theme.accent") ?? "seed"
+        return accents.first { $0.key == key }?.color ?? accents[0].color
+    }()
+
+    static let accents: [(key: String, name: String, color: Color)] = [
+        ("seed", "Azul SimpMusic", Color(red: 0x8E / 255, green: 0xCA / 255, blue: 0xE6 / 255)),
+        ("red", "Vermelho", Color(red: 0.98, green: 0.36, blue: 0.40)),
+        ("green", "Verde", Color(red: 0.40, green: 0.85, blue: 0.55)),
+        ("purple", "Roxo", Color(red: 0.72, green: 0.56, blue: 0.98)),
+        ("orange", "Laranja", Color(red: 1.0, green: 0.65, blue: 0.30)),
+        ("pink", "Rosa", Color(red: 1.0, green: 0.50, blue: 0.75)),
+    ]
     static let body = Color(red: 0xA8 / 255, green: 0xA8 / 255, blue: 0xA8 / 255)
 
     static func poppins(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {

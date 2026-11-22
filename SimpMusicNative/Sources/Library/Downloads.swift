@@ -43,13 +43,45 @@ final class Downloads: ObservableObject {
         }
     }
 
+    @Published private(set) var batchRemaining = 0
+
+    /// Downloads a whole list one song at a time (gentle on the network and on YouTube).
+    func downloadAll(_ tracks: [Track]) {
+        let pending = tracks.filter { Self.localFile(for: $0.id) == nil && !inProgress.contains($0.id) }
+        guard !pending.isEmpty else { return }
+        batchRemaining += pending.count
+        Task {
+            for track in pending {
+                await downloadNow(track)
+                batchRemaining = max(0, batchRemaining - 1)
+            }
+        }
+    }
+
+    private func downloadNow(_ track: Track) async {
+        guard !inProgress.contains(track.id), Self.localFile(for: track.id) == nil else { return }
+        inProgress.insert(track.id)
+        defer { inProgress.remove(track.id) }
+        do {
+            let stream = try await InnerTube.shared.audioStream(for: track.id, forDownload: true)
+            let target = Self.fileURL(for: track.id)
+            let partial = target.appendingPathExtension("part")
+            try await Self.fetchInChunks(stream.url, to: partial)
+            try? FileManager.default.removeItem(at: target)
+            try FileManager.default.moveItem(at: partial, to: target)
+            Library.shared.markDownloaded(track)
+        } catch {
+            NSLog("SimpNative: download failed for \(track.id): \(error)")
+        }
+    }
+
     func download(_ track: Track) {
         guard !inProgress.contains(track.id), Self.localFile(for: track.id) == nil else { return }
         inProgress.insert(track.id)
         Task {
             defer { inProgress.remove(track.id) }
             do {
-                let stream = try await InnerTube.shared.audioStream(for: track.id)
+                let stream = try await InnerTube.shared.audioStream(for: track.id, forDownload: true)
                 let target = Self.fileURL(for: track.id)
                 let partial = target.appendingPathExtension("part")
                 try await Self.fetchInChunks(stream.url, to: partial)

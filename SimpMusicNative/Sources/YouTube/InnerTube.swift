@@ -574,7 +574,7 @@ actor InnerTube {
     // MARK: Audio stream
 
     /// The AAC stream of [videoId] from the VISIONOS client.
-    func audioStream(for videoId: String) async throws -> AudioStream {
+    func audioStream(for videoId: String, forDownload: Bool = false) async throws -> AudioStream {
         let json = try await post("player", client: Self.visionOS, body: [
             "videoId": videoId,
             "contentCheckOk": true,
@@ -594,7 +594,7 @@ actor InnerTube {
         let streaming = json["streamingData"] as? [String: Any] ?? [:]
         let formats = (streaming["adaptiveFormats"] as? [[String: Any]] ?? []) + (streaming["formats"] as? [[String: Any]] ?? [])
         func audio(_ itag: Int) -> [String: Any]? { formats.first { ($0["itag"] as? Int) == itag && $0["url"] != nil } }
-        let saver = UserDefaults.standard.string(forKey: "quality.audio") == "low"
+        let saver = !forDownload && UserDefaults.standard.string(forKey: "quality.audio") == "low"
         guard let format = (saver ? audio(139) : nil) ?? audio(140) ?? audio(141) ?? formats.first(where: {
             ($0["mimeType"] as? String)?.hasPrefix("audio/mp4") == true && $0["url"] != nil
         }), let urlString = format["url"] as? String, let url = URL(string: urlString) else {
