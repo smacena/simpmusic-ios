@@ -44,7 +44,7 @@ struct ArtistView: View {
                             Text(shelf.title).font(Theme.headline).foregroundStyle(.white)
                             Spacer()
                             if let more = shelf.more {
-                                NavigationLink { MoreAlbumsView(browseId: more.browseId, params: more.params) } label: {
+                                NavigationLink { MoreDestination(more: more, title: shelf.title) } label: {
                                     Text("Mais").font(Theme.poppins(14, .medium)).foregroundStyle(.white)
                                 }
                             }

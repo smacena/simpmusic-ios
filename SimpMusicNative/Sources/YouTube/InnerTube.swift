@@ -268,8 +268,16 @@ actor InnerTube {
         var strapline: String = ""
         let title: String
         let items: [ShelfItem]
-        /// The shelf's "More" button when it opens an artist discography (Albums, Singles & EPs).
-        var more: (browseId: String, params: String)? = nil
+        /// The shelf's "More" button (HomeItem.MoreEndpoint): where it leads and YouTube's page type.
+        var more: MoreEndpoint? = nil
+    }
+
+    /// Where a section's "More" button leads. [pageType] is YouTube's `MUSIC_PAGE_TYPE_*`, so routing
+    /// follows it; `FEmusic_*` pages carry none and open the generic Browse page.
+    struct MoreEndpoint: Hashable {
+        let browseId: String
+        let params: String?
+        let pageType: String?
     }
 
     enum ShelfItem: Identifiable {
@@ -357,12 +365,137 @@ actor InnerTube {
         }
         let strapline = text(header?["strapline"])
         let moreEndpoint = (((header?["moreContentButton"] as? [String: Any])?["buttonRenderer"] as? [String: Any])?["navigationEndpoint"] as? [String: Any])?["browseEndpoint"] as? [String: Any]
-        var more: (browseId: String, params: String)?
-        if let e = moreEndpoint, findString("pageType", in: e) == "MUSIC_PAGE_TYPE_ARTIST_DISCOGRAPHY",
-           let id = e["browseId"] as? String, let params = e["params"] as? String {
-            more = (id, params)
+        var more: MoreEndpoint?
+        // FEmusic_new_releases_albums has answered 4xx for every client since 2026-09 (HomeParser
+        // drops it the same way), so its More would only open an error.
+        if let e = moreEndpoint, let id = e["browseId"] as? String, id != "FEmusic_new_releases_albums" {
+            more = MoreEndpoint(browseId: id, params: e["params"] as? String, pageType: findString("pageType", in: e))
         }
         return title.isEmpty || items.isEmpty ? nil : Shelf(strapline: strapline, title: title, items: items, more: more)
+    }
+
+    // MARK: Browse (a section's "More" page)
+
+    struct Mood: Identifiable, Hashable {
+        var id: String { params + title }
+        let title: String
+        let params: String
+        /// `solid.leftStripeColor`, full ARGB straight from the API.
+        let stripeColor: UInt32
+    }
+
+    struct BrowseCard: Identifiable {
+        let item: ShelfItem
+        /// Home's card shape: 16:9 for a video that plays in place, square for anything that opens a page.
+        let aspectRatio: CGFloat
+        var id: String { item.id }
+    }
+
+    struct BrowsePage {
+        let title: String?
+        let contents: [BrowseCard]
+        let moods: [Mood]
+    }
+
+    /// HomeRepository.getBrowsePage: every grid / carousel / music shelf / playlist shelf of the page
+    /// flattened into one de-duplicated list (no section titles), plus its mood & genre buttons.
+    func browsePage(browseId: String, params: String?) async throws -> BrowsePage {
+        var body: [String: Any] = ["browseId": browseId]
+        if let params, !params.isEmpty { body["params"] = params }
+        let json = try await post("browse", client: Self.webRemix, body: body)
+        let title = Self.text(((json["header"] as? [String: Any])?["musicHeaderRenderer"] as? [String: Any])?["title"])
+        var cards: [BrowseCard] = []
+        var seen = Set<String>()
+        var moods: [Mood] = []
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let b = dict["musicNavigationButtonRenderer"] as? [String: Any] {
+                    let endpoint = (b["clickCommand"] as? [String: Any])?["browseEndpoint"] as? [String: Any]
+                    let stripe = ((b["solid"] as? [String: Any])?["leftStripeColor"] as? NSNumber)?.uint32Value ?? 0xFF808080
+                    moods.append(Mood(title: Self.text(b["buttonText"]), params: endpoint?["params"] as? String ?? "", stripeColor: stripe))
+                    return
+                }
+                if let card = Self.parseBrowseCard(dict) {
+                    if seen.insert(card.id).inserted { cards.append(card) }
+                    return
+                }
+                for (key, value) in dict where key != "header" { walk(value) }
+            } else if let array = node as? [Any] {
+                for value in array { walk(value) }
+            }
+        }
+        walk(json["contents"] as Any)
+        if cards.isEmpty && moods.isEmpty { AppLog.w("InnerTube", "browse \(browseId) came back empty") }
+        return BrowsePage(title: title.isEmpty ? nil : title, contents: cards, moods: moods)
+    }
+
+    /// MoodScreen's data (`FEmusic_moods_and_genres_category` + the button's params): the header and
+    /// each section — carousel or grid — as a titled shelf.
+    func moodPage(params: String) async throws -> (title: String, shelves: [Shelf]) {
+        let json = try await post("browse", client: Self.webRemix, body: ["browseId": "FEmusic_moods_and_genres_category", "params": params])
+        let title = Self.text(((json["header"] as? [String: Any])?["musicHeaderRenderer"] as? [String: Any])?["title"])
+        var shelves: [Shelf] = []
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let shelf = dict["musicCarouselShelfRenderer"] as? [String: Any] {
+                    if let parsed = Self.parseShelf(shelf) { shelves.append(parsed) }
+                    return
+                }
+                if let grid = dict["gridRenderer"] as? [String: Any] {
+                    let gridTitle = Self.text(((grid["header"] as? [String: Any])?["gridHeaderRenderer"] as? [String: Any])?["title"])
+                    let wrapped: [String: Any] = ["contents": grid["items"] ?? [], "header": ["musicCarouselShelfBasicHeaderRenderer": ["title": ["runs": [["text": gridTitle.isEmpty ? title : gridTitle]]]]]]
+                    if let parsed = Self.parseShelf(wrapped) { shelves.append(parsed) }
+                    return
+                }
+                for value in dict.values { walk(value) }
+            } else if let array = node as? [Any] {
+                for value in array { walk(value) }
+            }
+        }
+        walk(json["contents"] as Any)
+        return (title, shelves)
+    }
+
+    private static func thumbs(_ node: Any?) -> [[String: Any]] {
+        (((node as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any])?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]] ?? []
+    }
+
+    /// Content.homeCardAspectRatio(): wide when the item plays in place and its thumbnail isn't square.
+    private static func ratio(_ thumbs: [[String: Any]], opensPage: Bool) -> CGFloat {
+        guard !opensPage, let first = thumbs.first else { return 1 }
+        let w = (first["width"] as? NSNumber)?.intValue, h = (first["height"] as? NSNumber)?.intValue
+        return w != h ? 16.0 / 9.0 : 1
+    }
+
+    private static func parseBrowseCard(_ dict: [String: Any]) -> BrowseCard? {
+        if let row = dict["musicResponsiveListItemRenderer"] as? [String: Any] {
+            guard let track = parseItem(row) else { return nil }
+            return BrowseCard(item: .song(track), aspectRatio: ratio(thumbs(row["thumbnail"]), opensPage: false))
+        }
+        if let two = dict["musicTwoRowItemRenderer"] as? [String: Any] {
+            let t = thumbs(two["thumbnailRenderer"])
+            let thumb = (t.last?["url"] as? String).flatMap(URL.init(string:))
+            let name = text(two["title"]), subtitle = text(two["subtitle"])
+            let nav = two["navigationEndpoint"] as? [String: Any]
+            if let browse = (nav?["browseEndpoint"] as? [String: Any])?["browseId"] as? String {
+                return BrowseCard(item: .collection(Collection(browseId: browse, title: name, subtitle: subtitle, thumbnail: thumb)), aspectRatio: 1)
+            }
+            if let id = (nav?["watchEndpoint"] as? [String: Any])?["videoId"] as? String {
+                let track = Track(id: id, title: name, artist: subtitle.components(separatedBy: " • ").first ?? subtitle, thumbnail: thumb, durationText: nil,
+                                  explicit: hasExplicitBadge(two), videoType: findString("musicVideoType", in: two))
+                return BrowseCard(item: .song(track), aspectRatio: ratio(t, opensPage: false))
+            }
+            return nil
+        }
+        if let ep = dict["musicMultiRowListItemRenderer"] as? [String: Any] {
+            // A podcast episode.
+            guard let id = findWatchVideoId(ep["onTap"]) ?? findWatchVideoId(ep) else { return nil }
+            let t = thumbs(ep["thumbnail"])
+            let thumb = (t.last?["url"] as? String).flatMap(URL.init(string:))
+            let track = Track(id: id, title: text(ep["title"]), artist: text(ep["subtitle"]), thumbnail: thumb, durationText: nil)
+            return BrowseCard(item: .song(track), aspectRatio: ratio(t, opensPage: false))
+        }
+        return nil
     }
 
     /// "Moods & genres": each category becomes a shelf of the playlists it opens.

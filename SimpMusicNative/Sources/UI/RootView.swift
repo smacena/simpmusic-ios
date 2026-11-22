@@ -41,6 +41,14 @@ struct RootView: View {
                 if id.hasPrefix("MPAD") { MoreAlbumsView(browseId: id, params: "ggMIegYIARoCAQI%3D") } else { ArtistView(browseId: id, fallbackName: "") }
             }.environmentObject(PlayerEngine.shared)
         }
+        .sheet(isPresented: .constant(UserDefaults.standard.string(forKey: "debugScreen")?.hasPrefix("browse:") == true)) {
+            // `browse:<browseId>[|params]` or `mood:<params>` style hook for headless tests.
+            let raw = String(UserDefaults.standard.string(forKey: "debugScreen")!.dropFirst(7)).split(separator: "|").map(String.init)
+            NavigationStack { BrowseView(browseId: raw[0], params: raw.count > 1 ? raw[1] : nil, title: nil) }.environmentObject(PlayerEngine.shared)
+        }
+        .sheet(isPresented: .constant(UserDefaults.standard.string(forKey: "debugScreen")?.hasPrefix("mood:") == true)) {
+            NavigationStack { MoodView(params: String(UserDefaults.standard.string(forKey: "debugScreen")!.dropFirst(5)), fallbackTitle: "") }.environmentObject(PlayerEngine.shared)
+        }
         #endif
         .alert("Erro", isPresented: Binding(get: { player.errorMessage != nil }, set: { if !$0 { player.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}

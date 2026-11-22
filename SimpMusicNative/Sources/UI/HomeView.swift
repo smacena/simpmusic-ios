@@ -110,7 +110,16 @@ struct ShelfView: View {
             if !shelf.strapline.isEmpty {
                 Text(shelf.strapline.uppercased()).font(Theme.poppins(13, .medium)).foregroundStyle(Theme.body).padding(.horizontal, 16)
             }
-            Text(shelf.title).font(Theme.headline).foregroundStyle(.white).padding(.horizontal, 16).padding(.bottom, 10)
+            HStack(alignment: .firstTextBaseline) {
+                Text(shelf.title).font(Theme.headline).foregroundStyle(.white)
+                Spacer()
+                if let more = shelf.more {
+                    NavigationLink { MoreDestination(more: more, title: shelf.title) } label: {
+                        Text("Mais").font(Theme.poppins(14, .medium)).foregroundStyle(.white)
+                    }
+                }
+            }
+            .padding(.horizontal, 16).padding(.bottom, 10)
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(alignment: .top, spacing: 16) {
                     ForEach(shelf.items) { item in
