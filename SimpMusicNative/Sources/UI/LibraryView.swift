@@ -62,6 +62,13 @@ struct LibraryView: View {
         }
     }
 
+    /// Settings → "Juntar curtidas": local favourites followed by the account's liked songs.
+    private var favoritesMerged: [Track] {
+        guard UserDefaults.standard.bool(forKey: "likes.merge"), let account = accountLikes else { return library.favorites }
+        let local = Set(library.favorites.map(\.id))
+        return library.favorites + account.filter { !local.contains($0.id) }
+    }
+
     /// The library's "Most played" dynamic playlist: this device's plays, by count, last 90 days.
     private var mostPlayed: [Track] {
         let since = Date().addingTimeInterval(-90 * 86400)
@@ -98,7 +105,7 @@ struct LibraryView: View {
                 .listRowBackground(Theme.surface)
             }
             playlistsSection
-            let tracks = section == 0 ? library.favorites : section == 1 ? library.downloaded : section == 2 ? library.recent : section == 4 ? mostPlayed : (accountLikes ?? [])
+            let tracks = section == 0 ? favoritesMerged : section == 1 ? library.downloaded : section == 2 ? library.recent : section == 4 ? mostPlayed : (accountLikes ?? [])
             if section == 3, accountLikes == nil { ProgressView().frame(maxWidth: .infinity) }
             if tracks.isEmpty {
                 Text(section == 0 ? "Toque no coração no player para guardar músicas aqui." :
@@ -124,7 +131,8 @@ struct LibraryView: View {
         .navigationTitle("Biblioteca")
         .task(id: section) {
             // The account's liked songs on YouTube Music.
-            if section == 3, accountLikes == nil { accountLikes = (try? await InnerTube.shared.collectionTracks("FEmusic_liked_videos")) ?? [] }
+            let wantsAccount = section == 3 || (section == 0 && UserDefaults.standard.bool(forKey: "likes.merge"))
+            if wantsAccount, account.isSignedIn, accountLikes == nil { accountLikes = (try? await InnerTube.shared.collectionTracks("FEmusic_liked_videos")) ?? [] }
         }
     }
 }

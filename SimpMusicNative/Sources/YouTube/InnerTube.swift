@@ -562,7 +562,29 @@ actor InnerTube {
     }
 
     /// The songs of a playlist or album page.
+    /// Settings → "Playlists do YouTube offline": every playlist/album opened is kept on disk, and
+    /// shown from there when the network fails (its downloaded songs then still play).
+    private static func cacheURL(_ browseId: String) -> URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("collections", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent(browseId.replacingOccurrences(of: "/", with: "_") + ".json")
+    }
+
     func collectionTracks(_ browseId: String) async throws -> [Track] {
+        let offline = UserDefaults.standard.object(forKey: "playlists.offline") as? Bool ?? true
+        do {
+            let tracks = try await fetchCollectionTracks(browseId)
+            if offline, let data = try? JSONEncoder().encode(tracks) { try? data.write(to: Self.cacheURL(browseId), options: .atomic) }
+            return tracks
+        } catch {
+            if offline, let data = try? Data(contentsOf: Self.cacheURL(browseId)), let cached = try? JSONDecoder().decode([Track].self, from: data) {
+                return cached
+            }
+            throw error
+        }
+    }
+
+    private func fetchCollectionTracks(_ browseId: String) async throws -> [Track] {
         let json = try await post("browse", client: Self.webRemix, body: ["browseId": browseId])
         var tracks = Self.parseListItems(json)
         // Album rows carry no artwork of their own: use the album cover.

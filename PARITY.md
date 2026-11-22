@@ -59,8 +59,8 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Sincronizar seguidos com YouTube | [x] | [ ] |
 | Enviar histórico ao Google | [x] | [x] |
 | Conteúdo explícito | [x] | [x] |
-| Playlists do YouTube offline | [x] | [ ] |
-| Juntar curtidas locais e do YouTube | [x] | [ ] |
+| Playlists do YouTube offline | [x] | [x] |
+| Juntar curtidas locais e do YouTube | [x] | [x] |
 | Proxy (tipo, host, porta, usuário, senha) | [x] | [x] (streaming de áudio usa a rede do sistema) |
 | Normalizar volume / pular silêncio | [x] | [x] |
 | Equalizador do sistema | [—] iOS não oferece | [—] |

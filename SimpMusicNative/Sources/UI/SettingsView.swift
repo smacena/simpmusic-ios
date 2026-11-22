@@ -23,6 +23,8 @@ struct SettingsView: View {
     @AppStorage("video.auto") private var videoAuto = false
     @AppStorage("radio.audioOnly") private var radioAudioOnly = false
     @AppStorage("history.google") private var historyGoogle = false
+    @AppStorage("likes.merge") private var mergeLikes = false
+    @AppStorage("playlists.offline") private var playlistsOffline = true
     @AppStorage("player.saveModes") private var saveModes = true
     @AppStorage("history.tracking") private var historyTracking = true
     @State private var confirmClearHistory = false
@@ -108,9 +110,11 @@ struct SettingsView: View {
                 Toggle("Mostrar conteúdo explícito", isOn: $explicitAllowed)
                 Toggle("Tocar o vídeo quando a faixa for videoclipe", isOn: $videoAuto)
                 Toggle("Rádio só com áudio (sem videoclipes)", isOn: $radioAudioOnly)
+                Toggle("Guardar playlists e álbuns abertos para ver offline", isOn: $playlistsOffline)
                 Toggle("Salvar aleatório e repetir", isOn: $saveModes)
                 if account.isSignedIn {
                     Toggle("Enviar histórico ao YouTube (melhora as recomendações)", isOn: $historyGoogle)
+                    Toggle("Juntar curtidas locais e do YouTube", isOn: $mergeLikes)
                 }
             }
             Section("Histórico de escuta") {
