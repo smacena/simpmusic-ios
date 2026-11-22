@@ -29,7 +29,7 @@ final class LyricsStore: ObservableObject {
             guard !Task.isCancelled, self.trackId == track.id else { return }
             self.lines = result?.lines ?? []
             self.source = result?.source
-            guard Self.translateEnabled, let language = Locale.current.language.languageCode?.identifier,
+            guard Self.translateEnabled, let language = UserDefaults.standard.string(forKey: "lyrics.translateLang").flatMap({ $0.isEmpty ? nil : $0 }) ?? Locale.current.language.languageCode?.identifier,
                   let translated = await Lyrics.translation(videoId: track.id, language: language),
                   self.trackId == track.id else { return }
             var map: [Double: String] = [:]

@@ -8,12 +8,23 @@ enum SponsorBlock {
         set { UserDefaults.standard.set(newValue, forKey: "sponsorblock.enabled") }
     }
 
+    /// The categories SimpMusic offers, with their names in the settings.
+    static let allCategories: [(key: String, name: String)] = [
+        ("sponsor", "Patrocínio"), ("selfpromo", "Autopromoção"), ("interaction", "Lembrete de interação"),
+        ("intro", "Introdução"), ("outro", "Encerramento"), ("preview", "Prévia"), ("music_offtopic", "Trecho sem música"), ("filler", "Enrolação"),
+    ]
+
+    static var categories: [String] {
+        get { (UserDefaults.standard.string(forKey: "sponsorblock.categories") ?? "sponsor,selfpromo,interaction,music_offtopic").split(separator: ",").map(String.init) }
+        set { UserDefaults.standard.set(newValue.joined(separator: ","), forKey: "sponsorblock.categories") }
+    }
+
     static func segments(for videoId: String) async -> [ClosedRange<Double>] {
-        guard enabled else { return [] }
+        guard enabled, !categories.isEmpty else { return [] }
         var comps = URLComponents(string: "https://sponsor.ajay.app/api/skipSegments")!
         comps.queryItems = [
             URLQueryItem(name: "videoID", value: videoId),
-            URLQueryItem(name: "categories", value: #"["sponsor","selfpromo","interaction","music_offtopic"]"#),
+            URLQueryItem(name: "categories", value: "[" + categories.map { "\"\($0)\"" }.joined(separator: ",") + "]"),
         ]
         guard let url = comps.url, let (data, response) = try? await URLSession.shared.data(from: url),
               (response as? HTTPURLResponse)?.statusCode == 200,

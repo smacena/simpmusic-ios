@@ -17,6 +17,11 @@ struct SettingsView: View {
     @AppStorage("player.saveModes") private var saveModes = true
     @AppStorage("history.tracking") private var historyTracking = true
     @State private var confirmClearHistory = false
+    @AppStorage("lyrics.translateLang") private var translateLang = ""
+    @AppStorage("backup.auto") private var autoBackup = false
+    @AppStorage("backup.days") private var backupDays = 7
+    @AppStorage("backup.keep") private var backupKeep = 5
+    @State private var sbCategories = Set(SponsorBlock.categories)
     @AppStorage("eightd.direction") private var eightDDirection = 1.0
     @AppStorage("eightd.period") private var eightDPeriod = 10.0
     @State private var crossfadeSeconds = PlayerEngine.shared.crossfadeSeconds
@@ -58,6 +63,12 @@ struct SettingsView: View {
                     ShareLink(item: backupURL) { Label("Compartilhar backup", systemImage: "square.and.arrow.up") }
                 }
                 Button("Restaurar backup") { importing = true }
+                Toggle("Backup automático", isOn: $autoBackup)
+                if autoBackup {
+                    Stepper("A cada \(backupDays) dia(s)", value: $backupDays, in: 1 ... 30)
+                    Stepper("Manter os \(backupKeep) mais recentes", value: $backupKeep, in: 1 ... 30)
+                    LabeledContent("Último backup", value: Backup.lastBackup.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "Nunca")
+                }
             }
             Section("Aparência") {
                 Picker("Estilo do player", selection: $playerStyle) {
@@ -111,6 +122,18 @@ struct SettingsView: View {
                     .onChange(of: normalize) { _, value in player.normalizeVolume = value }
                 Toggle("Pular trechos patrocinados (SponsorBlock)", isOn: $sponsorBlock)
                     .onChange(of: sponsorBlock) { _, value in SponsorBlock.enabled = value }
+                if sponsorBlock {
+                    ForEach(SponsorBlock.allCategories, id: \.key) { category in
+                        Toggle("  \(category.name)", isOn: Binding(
+                            get: { sbCategories.contains(category.key) },
+                            set: { on in
+                                if on { sbCategories.insert(category.key) } else { sbCategories.remove(category.key) }
+                                SponsorBlock.categories = SponsorBlock.allCategories.map(\.key).filter { sbCategories.contains($0) }
+                            }
+                        ))
+                        .font(Theme.poppins(14))
+                    }
+                }
                 Toggle("Baixar músicas curtidas automaticamente", isOn: $downloadLiked)
                 Toggle("Pular silêncio", isOn: $skipSilence)
                     .onChange(of: skipSilence) { _, value in player.skipSilence = value }
@@ -126,6 +149,15 @@ struct SettingsView: View {
                     .onChange(of: romanize) { _, value in Romanizer.enabled = value }
                 Toggle("Mostrar tradução da comunidade", isOn: $translate)
                     .onChange(of: translate) { _, value in LyricsStore.translateEnabled = value }
+                if translate {
+                    Picker("Idioma da tradução", selection: $translateLang) {
+                        Text("Do sistema").tag("")
+                        ForEach(["pt", "en", "es", "fr", "de", "it", "ja", "ko", "zh", "vi"], id: \.self) { code in
+                            Text(Locale.current.localizedString(forLanguageCode: code) ?? code).tag(code)
+                        }
+                    }
+                    .onChange(of: translateLang) { _, _ in LyricsStore.shared.reload(for: player.current, duration: player.duration) }
+                }
                 Picker("Fonte preferida", selection: $lyricsSource) {
                     ForEach(LyricsSource.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -194,6 +226,9 @@ struct SettingsView: View {
                     LabeledSlider(title: "Repetição", value: $effects.delayFeedback, range: 0 ... 0.9, unit: "")
                     LabeledSlider(title: "Mistura", value: $effects.delayMix, range: 0 ... 1, unit: "")
                 }
+            }
+            Section("Sobre") {
+                NavigationLink("Sobre o app") { AboutView() }
             }
         }
         .scrollContentBackground(.hidden)

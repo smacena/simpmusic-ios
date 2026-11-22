@@ -23,7 +23,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Wrapped (10 cartões, compartilhar) | [x] | [ ] parcial |
 | Ouvir Junto | [x] | [ ] |
 | Login YouTube / Spotify / Last.fm / Discord | [x] | [ ] só YouTube |
-| Créditos / Sobre / Bibliotecas | [x] | [ ] |
+| Créditos / Sobre / Bibliotecas | [x] | [x] |
 | Log do app (opções de desenvolvedor) | [x] | [ ] |
 
 ## Player
@@ -71,15 +71,15 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Encerrar serviço ao sair | [—] não existe no iOS | [—] |
 | Crossfade, duração, DJ, pular em álbum, AutoMix | [x] | [ ] parcial |
 | Histórico local + limpar histórico | [x] | [x] |
-| Provedor principal de letra, atraso, idioma da tradução, idioma da legenda | [x] | [ ] parcial |
+| Provedor principal de letra, atraso, idioma da tradução, idioma da legenda | [x] | [x] (legenda: falta) |
 | Ajudar a base de letras (nome, e-mail) | [x] | [ ] |
 | IA (provedor, chave, modelo, cabeçalhos, tradução por IA) | [x] | [ ] |
 | Spotify (letras, Canvas) / capa animada | [x] | [ ] |
 | Discord Rich Presence | [?] precisa de chave | [ ] |
 | Last.fm scrobble | [?] precisa de chave | [ ] |
-| SponsorBlock + categorias | [x] | [ ] parcial |
+| SponsorBlock + categorias | [x] | [x] |
 | Armazenamento / cache do player / limites | [x] (sem limite: AVPlayer não tem cache próprio) | [ ] |
-| Backup de baixadas, backup automático, frequência, manter N | [x] | [ ] parcial |
+| Backup de baixadas, backup automático, frequência, manter N | [x] | [x] |
 | Backup/restauração compatível com Android/desktop | [x] | [ ] |
 | Importar playlists de outros apps | [x] | [ ] |
 | Sobre, versão, atualização, autor, blog, avisos do blog, doação, licenças | [x] parcial | [ ] |

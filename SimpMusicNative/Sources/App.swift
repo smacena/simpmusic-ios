@@ -4,6 +4,7 @@ import SwiftUI
 struct SimpMusicApp: App {
     @StateObject private var player = PlayerEngine.shared
     @StateObject private var effects = AudioEffects.shared
+    @Environment(\.scenePhase) private var phase
 
     var body: some Scene {
         WindowGroup {
@@ -12,6 +13,7 @@ struct SimpMusicApp: App {
                 .environmentObject(effects)
                 .preferredColorScheme(.dark)
                 .font(Theme.bodyMedium)
+                .onChange(of: phase) { _, value in if value == .active { Backup.autoBackupIfDue() } }
         }
     }
 }
