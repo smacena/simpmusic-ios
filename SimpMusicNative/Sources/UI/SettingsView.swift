@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var importing = false
     @State private var message: String?
     @State private var romanize = Romanizer.enabled
+    @State private var translate = LyricsStore.translateEnabled
 
     var body: some View {
         Form {
@@ -47,6 +48,8 @@ struct SettingsView: View {
             Section("Letras") {
                 Toggle("Romanizar japonês, chinês e coreano", isOn: $romanize)
                     .onChange(of: romanize) { _, value in Romanizer.enabled = value }
+                Toggle("Mostrar tradução da comunidade", isOn: $translate)
+                    .onChange(of: translate) { _, value in LyricsStore.translateEnabled = value }
             }
             Section("Equalizador") {
                 Toggle("Ativado", isOn: $effects.eqEnabled)

@@ -43,6 +43,9 @@ struct LyricsView: View {
                                 if let reading = Romanizer.reading(for: line.text) {
                                     Text(reading).font(Theme.poppins(line.id == current ? 18 : 16, .medium)).opacity(0.75)
                                 }
+                                if let translated = lyrics.translated(line) {
+                                    Text(translated).font(Theme.poppins(line.id == current ? 18 : 16)).foregroundStyle(Theme.seed).opacity(0.9)
+                                }
                             }
                                 .foregroundStyle(.white.opacity(line.id == current ? 1 : (lyrics.isSynced ? 0.35 : 0.85)))
                                 .frame(maxWidth: .infinity, alignment: .leading)

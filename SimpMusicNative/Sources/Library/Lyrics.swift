@@ -52,6 +52,22 @@ enum Lyrics {
         return try? JSONSerialization.jsonObject(with: data)
     }
 
+    /// Community translation from SimpMusic Lyrics (the service the SimpMusic apps use), as LRC
+    /// lines, in [language] (two letters). Nil when nobody translated this song yet.
+    static func translation(videoId: String, language: String) async -> [LyricLine]? {
+        guard let url = URL(string: "https://api-lyrics.simpmusic.org/v1/translated/\(videoId)/\(language)") else { return nil }
+        var req = URLRequest(url: url)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("SimpMusicLyrics/1.0", forHTTPHeaderField: "User-Agent")
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        let object = (json as? [String: Any]) ?? ((json as? [[String: Any]])?.max { ($0["vote"] as? Int ?? 0) < ($1["vote"] as? Int ?? 0) })
+        guard let lrc = object?["translatedLyric"] as? String, !lrc.isEmpty else { return nil }
+        let lines = parse(lrc)
+        return lines.isEmpty ? nil : lines
+    }
+
     static func parse(_ lrc: String) -> [LyricLine] {
         var lines: [LyricLine] = []
         let pattern = try! NSRegularExpression(pattern: #"\[(\d+):(\d+(?:\.\d+)?)\]"#)
