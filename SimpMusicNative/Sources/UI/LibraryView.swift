@@ -85,6 +85,12 @@ struct LibraryView: View {
                 Label("Estatísticas de escuta", systemImage: "chart.bar.fill").font(Theme.poppins(16, .medium)).foregroundStyle(.white)
             }
             .listRowBackground(Theme.surface)
+            if Library.trackingEnabled, !library.plays.isEmpty {
+                NavigationLink { WrappedLibraryView() } label: {
+                    Label("Wrapped e retrospectivas do mês", systemImage: "sparkles.rectangle.stack").font(Theme.poppins(16, .medium)).foregroundStyle(.white)
+                }
+                .listRowBackground(Theme.surface)
+            }
             if account.isSignedIn {
                 NavigationLink { MixForYouView() } label: {
                     Label("Mix para você", systemImage: "sparkles").font(Theme.poppins(16, .medium)).foregroundStyle(.white)
@@ -150,5 +156,74 @@ struct MixForYouView: View {
     private func load() async {
         shelves = (try? await InnerTube.shared.shelves(browseId: "FEmusic_mixed_for_you")) ?? []
         loading = false
+    }
+}
+
+
+/// The Library's Wrapped chip (LibraryWrappedTab.kt): the year's Wrapped, then one recap playlist
+/// per month with plays, newest first, at most twelve — each the month's songs by listening time.
+struct WrappedLibraryView: View {
+    @EnvironmentObject private var player: PlayerEngine
+    @ObservedObject private var library = Library.shared
+    @State private var showWrapped = false
+
+    private var months: [(key: DateComponents, title: String, tracks: [Track])] {
+        let cal = Calendar.current
+        let groups = Dictionary(grouping: library.plays) { cal.dateComponents([.year, .month], from: $0.date) }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.dateFormat = "LLLL 'de' yyyy"
+        return groups.compactMap { key, events -> (DateComponents, String, [Track])? in
+            guard let date = cal.date(from: key) else { return nil }
+            let byTrack = Dictionary(grouping: events, by: \.track.id).values
+                .sorted { $0.reduce(0) { $0 + $1.seconds } > $1.reduce(0) { $0 + $1.seconds } }
+            return (key, formatter.string(from: date).capitalized, byTrack.prefix(50).map(\.[0].track))
+        }
+        .sorted { ($0.0.year ?? 0, $0.0.month ?? 0) > ($1.0.year ?? 0, $1.0.month ?? 0) }
+        .prefix(12).map { $0 }
+    }
+
+    var body: some View {
+        List {
+            Button { showWrapped = true } label: {
+                HStack {
+                    Image(icon: "sparkles")
+                    Text("SimpMusic Wrapped \(String(Calendar.current.component(.year, from: Date())))").font(Theme.poppins(17, .bold))
+                    Spacer()
+                    Image(icon: "chevron.right")
+                }
+                .foregroundStyle(.white).padding(16)
+                .background(LinearGradient(colors: [Theme.seed.opacity(0.8), .purple.opacity(0.6)], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 14))
+            }
+            .listRowBackground(Theme.background)
+            Section("Retrospectivas do mês") {
+                ForEach(months, id: \.title) { month in
+                    NavigationLink {
+                        List {
+                            ForEach(Array(month.tracks.enumerated()), id: \.element.id) { offset, track in
+                                Button { player.play(month.tracks, startAt: offset, title: month.title) } label: { TrackRow(track: track) }
+                                    .buttonStyle(.plain).listRowBackground(Theme.background)
+                            }
+                        }
+                        .listStyle(.plain).scrollContentBackground(.hidden).background(Theme.background)
+                        .navigationTitle(month.title)
+                    } label: {
+                        HStack(spacing: 12) {
+                            PlaylistCover(tracks: Array(month.tracks.prefix(4))).frame(width: 56, height: 56)
+                            VStack(alignment: .leading) {
+                                Text(month.title).font(Theme.poppins(16, .medium)).foregroundStyle(.white)
+                                Text("\(month.tracks.count) músicas").font(Theme.bodySmall).foregroundStyle(Theme.body)
+                            }
+                        }
+                    }
+                    .listRowBackground(Theme.background)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
+        .navigationTitle("Wrapped")
+        .fullScreenCover(isPresented: $showWrapped) { WrappedView() }
     }
 }

@@ -10,7 +10,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Início (carrosséis, chips, Mood) | [x] | [x] |
 | Busca (abas, sugestões, histórico) | [x] | [x] |
 | Biblioteca (playlists, curtidas, baixadas, chips) | [x] | [x] |
-| Biblioteca: aba Wrapped + recap mensal | [x] | [ ] |
+| Biblioteca: aba Wrapped + recap mensal | [x] | [x] |
 | Mix para você (MixForYouScreen) | [x] | [x] |
 | Playlists dinâmicas da biblioteca | [x] | [x] (seguidos depende de "seguir artistas") |
 | Playlist local (editar, IA sugerir) | [x] | [ ] parcial |
