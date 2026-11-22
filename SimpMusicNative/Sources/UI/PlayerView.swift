@@ -16,6 +16,7 @@ struct PlayerView: View {
     @State private var showLyrics = false
     @State private var showInfo = false
     @State private var showSleep = false
+    @State private var addTo: Track?
 
     var body: some View {
         ZStack {
@@ -40,6 +41,7 @@ struct PlayerView: View {
         .onChange(of: player.current?.id) { _, _ in refresh() }
         .sheet(isPresented: $showQueue) { QueueView().preferredColorScheme(.dark) }
         .fullScreenCover(isPresented: $showLyrics) { LyricsView() }
+        .sheet(item: $addTo) { AddToPlaylistSheet(track: $0).presentationDetents([.medium, .large]).preferredColorScheme(.dark) }
         .sheet(isPresented: $showInfo) { SongInfoView().presentationDetents([.medium]).preferredColorScheme(.dark) }
         .confirmationDialog("Temporizador de sono", isPresented: $showSleep, titleVisibility: .visible) {
             ForEach([5, 15, 30, 45, 60], id: \.self) { m in Button("\(m) minutos") { player.setSleepTimer(minutes: m) } }
@@ -202,7 +204,7 @@ struct PlayerView: View {
             .contentShape(Rectangle())
             Spacer()
             if let track = player.current {
-                Button { library.toggleFavorite(track) } label: { Image(systemName: "text.badge.plus") }
+                Button { addTo = track } label: { Image(systemName: "text.badge.plus") }
             }
             Button { showQueue = true } label: { Image(systemName: "list.bullet") }
         }

@@ -6,6 +6,61 @@ struct LibraryView: View {
     @ObservedObject private var account = Account.shared
     @State private var section = 0
     @State private var accountLikes: [Track]?
+    @State private var accountPlaylists: [InnerTube.Collection]?
+    @State private var creating = false
+    @State private var newName = ""
+
+    @ViewBuilder
+    private var playlistsSection: some View {
+        if section == 0 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 14) {
+                    Button { creating = true } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10).fill(Theme.surfaceHigh)
+                                Image(systemName: "plus").font(.system(size: 34, weight: .semibold)).foregroundStyle(.white)
+                            }
+                            .frame(width: 120, height: 120)
+                            Text("Nova playlist").font(Theme.poppins(14, .medium)).foregroundStyle(.white)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    ForEach(library.playlists) { playlist in
+                        NavigationLink { LocalPlaylistView(id: playlist.id) } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                PlaylistCover(tracks: playlist.tracks).frame(width: 120, height: 120)
+                                Text(playlist.name).font(Theme.poppins(14, .medium)).foregroundStyle(.white).lineLimit(1)
+                            }
+                            .frame(width: 120)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    ForEach(accountPlaylists ?? [], id: \.browseId) { c in
+                        NavigationLink { CollectionView(collection: c) } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                AsyncImage(url: c.thumbnail) { $0.resizable().scaledToFill() } placeholder: { Theme.surfaceHigh }
+                                    .frame(width: 120, height: 120).clipShape(RoundedRectangle(cornerRadius: 10))
+                                Text(c.title).font(Theme.poppins(14, .medium)).foregroundStyle(.white).lineLimit(1)
+                            }
+                            .frame(width: 120)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .listRowBackground(Theme.background)
+            .listRowSeparator(.hidden)
+            .alert("Nova playlist", isPresented: $creating) {
+                TextField("Nome", text: $newName)
+                Button("Criar") { library.createPlaylist(newName); newName = "" }
+                Button("Cancelar", role: .cancel) {}
+            }
+            .task {
+                if account.isSignedIn, accountPlaylists == nil { accountPlaylists = (try? await InnerTube.shared.accountPlaylists()) ?? [] }
+            }
+        }
+    }
 
     var body: some View {
         List {
@@ -18,6 +73,7 @@ struct LibraryView: View {
             .pickerStyle(.segmented)
             .listRowSeparator(.hidden)
             .listRowBackground(Theme.background)
+            playlistsSection
             let tracks = section == 0 ? library.favorites : section == 1 ? library.downloaded : section == 2 ? library.recent : (accountLikes ?? [])
             if section == 3, accountLikes == nil { ProgressView().frame(maxWidth: .infinity) }
             if tracks.isEmpty {

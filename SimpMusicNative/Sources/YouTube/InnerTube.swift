@@ -339,6 +339,30 @@ actor InnerTube {
         return shelves
     }
 
+    /// The signed-in account's playlists on YouTube Music.
+    func accountPlaylists() async throws -> [Collection] {
+        let json = try await post("browse", client: Self.webRemix, body: ["browseId": "FEmusic_liked_playlists"])
+        var out: [Collection] = []
+        var seen = Set<String>()
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let two = dict["musicTwoRowItemRenderer"] as? [String: Any],
+                   let id = ((two["navigationEndpoint"] as? [String: Any])?["browseEndpoint"] as? [String: Any])?["browseId"] as? String,
+                   id.hasPrefix("VL"), seen.insert(id).inserted {
+                    let thumbs = (((two["thumbnailRenderer"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any])?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
+                    out.append(Collection(browseId: id, title: Self.text(two["title"]), subtitle: Self.text(two["subtitle"]),
+                                          thumbnail: (thumbs?.last?["url"] as? String).flatMap(URL.init(string:))))
+                    return
+                }
+                for value in dict.values { walk(value) }
+            } else if let array = node as? [Any] {
+                for value in array { walk(value) }
+            }
+        }
+        walk(json)
+        return out
+    }
+
     /// The songs of a playlist or album page.
     func collectionTracks(_ browseId: String) async throws -> [Track] {
         let json = try await post("browse", client: Self.webRemix, body: ["browseId": browseId])

@@ -9,6 +9,13 @@ final class Library: ObservableObject {
     @Published private(set) var favorites: [Track] = []
     @Published private(set) var recent: [Track] = []
     @Published private(set) var downloaded: [Track] = []
+    @Published private(set) var playlists: [LocalPlaylist] = []
+
+    struct LocalPlaylist: Identifiable, Codable, Hashable {
+        var id = UUID()
+        var name: String
+        var tracks: [Track]
+    }
 
     private let dir: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("library", isDirectory: true)
@@ -20,6 +27,46 @@ final class Library: ObservableObject {
         favorites = load("favorites") ?? []
         recent = load("recent") ?? []
         downloaded = load("downloaded") ?? []
+        playlists = load("playlists") ?? []
+    }
+
+    // MARK: Own playlists
+
+    @discardableResult
+    func createPlaylist(_ name: String) -> LocalPlaylist {
+        let playlist = LocalPlaylist(name: name.isEmpty ? "Nova playlist" : name, tracks: [])
+        playlists.insert(playlist, at: 0)
+        save(playlists, "playlists")
+        return playlist
+    }
+
+    func renamePlaylist(_ id: UUID, to name: String) {
+        guard let i = playlists.firstIndex(where: { $0.id == id }), !name.isEmpty else { return }
+        playlists[i].name = name
+        save(playlists, "playlists")
+    }
+
+    func deletePlaylist(_ id: UUID) {
+        playlists.removeAll { $0.id == id }
+        save(playlists, "playlists")
+    }
+
+    func add(_ track: Track, to id: UUID) {
+        guard let i = playlists.firstIndex(where: { $0.id == id }), !playlists[i].tracks.contains(where: { $0.id == track.id }) else { return }
+        playlists[i].tracks.append(track)
+        save(playlists, "playlists")
+    }
+
+    func remove(at offsets: IndexSet, from id: UUID) {
+        guard let i = playlists.firstIndex(where: { $0.id == id }) else { return }
+        playlists[i].tracks.remove(atOffsets: offsets)
+        save(playlists, "playlists")
+    }
+
+    func move(from source: IndexSet, to destination: Int, in id: UUID) {
+        guard let i = playlists.firstIndex(where: { $0.id == id }) else { return }
+        playlists[i].tracks.move(fromOffsets: source, toOffset: destination)
+        save(playlists, "playlists")
     }
 
     func isFavorite(_ track: Track) -> Bool { favorites.contains { $0.id == track.id } }
