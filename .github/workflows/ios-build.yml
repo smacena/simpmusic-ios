@@ -1,0 +1,72 @@
+# Builds for the personal iPhone apps, so the MacBook does not have to (it runs hot).
+# - Swift app (SimpMusicNative): on every push that touches it. ~3 min of a macOS runner.
+# - Kotlin app (iosApp): only by hand (Actions → "iOS build" → Run workflow → kotlin = true),
+#   because a Kotlin/Native build is long and macOS minutes count 10x on a private repo.
+name: iOS build
+
+on:
+  push:
+    branches: [main]
+    paths: ["SimpMusicNative/**", ".github/workflows/ios-build.yml"]
+  workflow_dispatch:
+    inputs:
+      kotlin:
+        description: "Also build the Kotlin iOS app (long)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swift:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Build SimpMusicNative (simulator, unsigned)
+        working-directory: SimpMusicNative
+        run: |
+          set -o pipefail
+          xcodebuild -project SimpMusicNative.xcodeproj -scheme SimpMusicNative -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build.log | grep -E "error:|warning: unre|BUILD" || true
+          grep -q "BUILD SUCCEEDED" build.log
+      - name: C audio tests (pitch, 8D)
+        run: |
+          cat > /tmp/t.c <<'C'
+          #include "SimpDSP.h"
+          #include <stdio.h>
+          #include <math.h>
+          int main(void){ static float d[96000]; for(int i=0;i<96000;i++) d[i]=0.5f*sinf(2*M_PI*440*i/44100.0);
+           simp_pitch_set(powf(2,2/12.0f)); for(int o=0;o<96000;o+=512) simp_process_channel(0,0,d+o,512);
+           int zc=0; for(int i=44100;i<88199;i++) if(d[i]<=0&&d[i+1]>0) zc++;
+           printf("pitch +2 st: %d Hz (expect ~494)\n",zc); return (zc>485&&zc<503)?0:1; }
+          C
+          clang -O2 -I SimpMusicNative/Sources/Audio SimpMusicNative/Sources/Audio/SimpDSP.c /tmp/t.c \
+            -framework Accelerate -framework MediaToolbox -framework AudioToolbox -framework CoreMedia -framework CoreFoundation -o /tmp/t
+          /tmp/t
+
+  kotlin:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.kotlin }}
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Fit Gradle to the runner (7 GB)
+        run: sed -i '' 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx5g -XX:+UseParallelGC/' gradle.properties
+      - name: Kotlin iOS tests
+        run: ./gradlew :loginSync:iosSimulatorArm64Test :data:compileKotlinIosSimulatorArm64 --no-daemon
+      - name: Build iosApp (simulator, unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build.log | grep -E "error:|BUILD" || true
+          grep -q "BUILD SUCCEEDED" build.log
