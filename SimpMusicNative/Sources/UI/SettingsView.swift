@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var skipSilence = PlayerEngine.shared.skipSilence
     @State private var sponsorBlock = SponsorBlock.enabled
     @AppStorage("download.liked") private var downloadLiked = false
+    @AppStorage("smart.enabled") private var smartDownloads = false
+    @AppStorage("smart.count") private var smartCount = 20
     @AppStorage("eightd.enabled") private var eightD = false
     @AppStorage("content.country") private var contentCountry = ""
     @AppStorage("content.language") private var contentLanguage = ""
@@ -135,6 +137,13 @@ struct SettingsView: View {
                     }
                 }
                 Toggle("Baixar músicas curtidas automaticamente", isOn: $downloadLiked)
+                Toggle("Downloads inteligentes", isOn: $smartDownloads)
+                    .onChange(of: smartDownloads) { _, on in if on { SmartDownloads.runIfDue(force: true) } }
+                if smartDownloads {
+                    Stepper("Manter as \(smartCount) mais ouvidas", value: $smartCount, in: 5 ... 200, step: 5)
+                    Text(Library.trackingEnabled ? "Baixa sozinho, uma vez por dia, o que você mais ouviu nos últimos 30 dias." : "Precisa do histórico de escuta ligado.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Toggle("Pular silêncio", isOn: $skipSilence)
                     .onChange(of: skipSilence) { _, value in player.skipSilence = value }
                 Toggle("Crossfade", isOn: $crossfade)

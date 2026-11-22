@@ -15,7 +15,7 @@ struct SimpMusicApp: App {
                 .environmentObject(effects)
                 .preferredColorScheme(.dark)
                 .font(Theme.bodyMedium)
-                .onChange(of: phase) { _, value in if value == .active { Backup.autoBackupIfDue() } }
+                .onChange(of: phase) { _, value in if value == .active { Backup.autoBackupIfDue(); SmartDownloads.runIfDue() } }
         }
     }
 }

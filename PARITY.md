@@ -53,7 +53,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | País do conteúdo, idioma de áudio preferido | [x] | [x] |
 | Qualidade (áudio, vídeo, download áudio/vídeo) | [x] | [ ] parcial |
 | Baixar curtidas automaticamente | [x] | [x] |
-| Downloads inteligentes + tamanho | [x] | [ ] |
+| Downloads inteligentes + tamanho | [x] | [x] |
 | Vídeo em vez de áudio | [x] | [x] |
 | Rádio só áudio | [x] | [x] |
 | Sincronizar seguidos com YouTube | [x] | [ ] |
