@@ -35,6 +35,12 @@ struct RootView: View {
         .sheet(isPresented: .constant(UserDefaults.standard.string(forKey: "debugScreen")?.hasPrefix("applog") == true)) {
             NavigationStack { AppLogView() }
         }
+        .sheet(isPresented: .constant(UserDefaults.standard.string(forKey: "debugScreen")?.hasPrefix("artist:") == true)) {
+            let id = String(UserDefaults.standard.string(forKey: "debugScreen")!.dropFirst(7))
+            NavigationStack {
+                if id.hasPrefix("MPAD") { MoreAlbumsView(browseId: id, params: "ggMIegYIARoCAQI%3D") } else { ArtistView(browseId: id, fallbackName: "") }
+            }.environmentObject(PlayerEngine.shared)
+        }
         #endif
         .alert("Erro", isPresented: Binding(get: { player.errorMessage != nil }, set: { if !$0 { player.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}

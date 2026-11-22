@@ -268,6 +268,8 @@ actor InnerTube {
         var strapline: String = ""
         let title: String
         let items: [ShelfItem]
+        /// The shelf's "More" button when it opens an artist discography (Albums, Singles & EPs).
+        var more: (browseId: String, params: String)? = nil
     }
 
     enum ShelfItem: Identifiable {
@@ -354,7 +356,13 @@ actor InnerTube {
             }
         }
         let strapline = text(header?["strapline"])
-        return title.isEmpty || items.isEmpty ? nil : Shelf(strapline: strapline, title: title, items: items)
+        let moreEndpoint = (((header?["moreContentButton"] as? [String: Any])?["buttonRenderer"] as? [String: Any])?["navigationEndpoint"] as? [String: Any])?["browseEndpoint"] as? [String: Any]
+        var more: (browseId: String, params: String)?
+        if let e = moreEndpoint, findString("pageType", in: e) == "MUSIC_PAGE_TYPE_ARTIST_DISCOGRAPHY",
+           let id = e["browseId"] as? String, let params = e["params"] as? String {
+            more = (id, params)
+        }
+        return title.isEmpty || items.isEmpty ? nil : Shelf(strapline: strapline, title: title, items: items, more: more)
     }
 
     /// "Moods & genres": each category becomes a shelf of the playlists it opens.
@@ -518,6 +526,32 @@ actor InnerTube {
         }
         walk(json["contents"] as Any)
         return ArtistPage(name: name, thumbnail: thumb, songs: songs, shelves: shelves)
+    }
+
+    /// MoreAlbumsScreen's data: every album (or single/EP) of an artist — `MPAD<channel>` with the
+    /// shelf's params — and the page title (the artist name).
+    func discography(browseId: String, params: String) async throws -> (title: String, items: [Collection]) {
+        let json = try await post("browse", client: Self.webRemix, body: ["browseId": browseId, "params": params])
+        let title = Self.text(((json["header"] as? [String: Any])?["musicHeaderRenderer"] as? [String: Any])?["title"])
+        var items: [Collection] = []
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let two = dict["musicTwoRowItemRenderer"] as? [String: Any] {
+                    let thumbs = (((two["thumbnailRenderer"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any])?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
+                    let thumb = (thumbs?.last?["url"] as? String).flatMap(URL.init(string:))
+                    if let id = ((two["navigationEndpoint"] as? [String: Any])?["browseEndpoint"] as? [String: Any])?["browseId"] as? String {
+                        items.append(Collection(browseId: id, title: Self.text(two["title"]), subtitle: Self.text(two["subtitle"]), thumbnail: thumb))
+                    }
+                    return
+                }
+                for value in dict.values { walk(value) }
+            } else if let array = node as? [Any] {
+                for value in array { walk(value) }
+            }
+        }
+        walk(json["contents"] as Any)
+        if items.isEmpty { AppLog.w("InnerTube", "discography \(browseId) came back empty") }
+        return (title, items)
     }
 
     // MARK: Lyrics tab

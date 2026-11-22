@@ -15,7 +15,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Playlists dinâmicas da biblioteca | [x] | [ ] |
 | Playlist local (editar, IA sugerir) | [x] | [ ] parcial |
 | Álbum / Playlist / Artista (cabeçalho imersivo) | [x] | [ ] parcial |
-| Mais álbuns do artista | [x] | [ ] |
+| Mais álbuns do artista | [x] | [x] |
 | Navegar (BrowseScreen) | [x] | [ ] |
 | Podcasts | [x] | [ ] |
 | Notificações (lançamentos de artistas seguidos) | [x] | [ ] |

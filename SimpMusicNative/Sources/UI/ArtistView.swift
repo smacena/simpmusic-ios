@@ -40,7 +40,16 @@ struct ArtistView: View {
                 }
                 ForEach(page?.shelves ?? []) { shelf in
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(shelf.title).font(Theme.headline).foregroundStyle(.white).padding(.horizontal)
+                        HStack {
+                            Text(shelf.title).font(Theme.headline).foregroundStyle(.white)
+                            Spacer()
+                            if let more = shelf.more {
+                                NavigationLink { MoreAlbumsView(browseId: more.browseId, params: more.params) } label: {
+                                    Text("Mais").font(Theme.poppins(14, .medium)).foregroundStyle(.white)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(alignment: .top, spacing: 14) {
                                 ForEach(shelf.items) { item in
@@ -68,6 +77,51 @@ struct ArtistView: View {
         .task {
             guard page == nil else { return }
             do { page = try await InnerTube.shared.artist(browseId) } catch { failed = true }
+        }
+    }
+}
+
+/// MoreAlbumsScreen.kt: every album, or every single/EP, of an artist in an adaptive grid
+/// (as many 170-wide columns as fit), the artist's name as the title.
+struct MoreAlbumsView: View {
+    let browseId: String
+    let params: String
+    @State private var title = ""
+    @State private var items: [InnerTube.Collection]?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let items {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 10)], spacing: 10) {
+                        ForEach(items, id: \.browseId) { c in
+                            NavigationLink { CollectionView(collection: c) } label: { Tile(url: c.thumbnail, title: c.title, subtitle: c.subtitle) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 10).padding(.top, 10)
+                    Color.clear.frame(height: 160)
+                }
+            } else if failed {
+                Text("Erro").foregroundStyle(Theme.body)
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.background)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard items == nil else { return }
+            do {
+                let page = try await InnerTube.shared.discography(browseId: browseId, params: params)
+                if page.items.isEmpty { failed = true } else { title = page.title; items = page.items }
+            } catch {
+                AppLog.e("MoreAlbums", "discography \(browseId) failed", error)
+                failed = true
+            }
         }
     }
 }
