@@ -6,6 +6,8 @@ struct SimpMusicApp: App {
     @StateObject private var effects = AudioEffects.shared
     @Environment(\.scenePhase) private var phase
 
+    init() { AppLog.installCrashHandler() }
+
     var body: some Scene {
         WindowGroup {
             RootView()

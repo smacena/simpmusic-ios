@@ -166,7 +166,10 @@ actor InnerTube {
         }
         let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200 ..< 300).contains(status) else { throw InnerTubeError.http(status) }
+        guard (200 ..< 300).contains(status) else {
+            AppLog.w("InnerTube", "\(endpoint) via \(client.name) answered HTTP \(status)")
+            throw InnerTubeError.http(status)
+        }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw InnerTubeError.badResponse
         }
@@ -628,6 +631,7 @@ actor InnerTube {
                 visitorData = nil
                 UserDefaults.standard.removeObject(forKey: "visitorData")
             }
+            AppLog.w("InnerTube", "\(videoId) unplayable: \(status)")
             throw InnerTubeError.unplayable(status)
         }
         let streaming = json["streamingData"] as? [String: Any] ?? [:]

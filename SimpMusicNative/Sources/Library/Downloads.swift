@@ -71,7 +71,7 @@ final class Downloads: ObservableObject {
             try FileManager.default.moveItem(at: partial, to: target)
             Library.shared.markDownloaded(track)
         } catch {
-            NSLog("SimpNative: download failed for \(track.id): \(error)")
+            AppLog.e("Download", "download failed for \(track.id)", error)
         }
     }
 
@@ -88,8 +88,9 @@ final class Downloads: ObservableObject {
                 try? FileManager.default.removeItem(at: target)
                 try FileManager.default.moveItem(at: partial, to: target)
                 Library.shared.markDownloaded(track)
+                AppLog.i("Download", "downloaded \(track.id) (\(track.title))")
             } catch {
-                NSLog("SimpNative: download failed for \(track.id): \(error)")
+                AppLog.e("Download", "download failed for \(track.id)", error)
             }
         }
     }

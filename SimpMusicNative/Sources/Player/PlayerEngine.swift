@@ -297,7 +297,7 @@ final class PlayerEngine: ObservableObject {
                 videoPlayer.rate = isPlaying ? rate : 0
                 videoMode = true
             } catch {
-                NSLog("SimpNative: video failed: \(error)")
+                AppLog.e("Player", "video failed for \(track.id)", error)
                 errorMessage = "Vídeo indisponível para esta música"
             }
         }
@@ -420,7 +420,7 @@ final class PlayerEngine: ObservableObject {
                 guard self.current?.id == track.id else { return }
                 self.isLoading = false
                 self.errorMessage = "Não foi possível tocar \"\(track.title)\""
-                NSLog("SimpNative: load failed for \(track.id): \(error)")
+                AppLog.e("Player", "load failed for \(track.id)", error)
             }
         }
     }
@@ -431,6 +431,7 @@ final class PlayerEngine: ObservableObject {
         for attempt in 0 ..< 6 {
             do { return try await InnerTube.shared.audioStream(for: id) } catch {
                 lastError = error
+                AppLog.w("Player", "stream for \(id) failed (attempt \(attempt + 1)): \(error)")
                 if case InnerTubeError.unplayable = error, attempt > 0 { throw error }
                 try await Task.sleep(nanoseconds: 5_000_000_000)
             }
@@ -471,7 +472,7 @@ final class PlayerEngine: ObservableObject {
         // Settings: "Vídeo em vez de áudio" plays a music video's picture when the track is one.
         if UserDefaults.standard.bool(forKey: "video.auto"), current?.isVideo == true, !videoMode { toggleVideo() }
         persistQueue()
-        NSLog("SimpNative: playing \(current?.id ?? "?") dur=\(Int(duration))s")
+        AppLog.i("Player", "playing \(current?.id ?? "?") dur=\(Int(duration))s")
     }
 
     private static func audioMix(for track: AVAssetTrack, slot: Int32) -> AVAudioMix? {

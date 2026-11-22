@@ -24,7 +24,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Ouvir Junto | [x] | [ ] |
 | Login YouTube / Spotify (Last.fm e Discord: usuário não quer) | [x] | [ ] só YouTube |
 | Créditos / Sobre / Bibliotecas | [x] | [x] |
-| Log do app (opções de desenvolvedor) | [x] | [ ] |
+| Log do app (opções de desenvolvedor) | [x] | [x] |
 
 ## Player
 | Item | K | S |
@@ -83,7 +83,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Backup/restauração compatível com Android/desktop | [x] | [ ] |
 | Importar playlists de outros apps | [x] | [ ] |
 | Sobre, versão, atualização, autor, blog, avisos do blog, doação, licenças | [x] parcial | [ ] |
-| Log do app | [x] | [ ] |
+| Log do app | [x] | [x] |
 | Sincronizar login | [x] | [x] só YouTube |
 | Sincronizar biblioteca (canal pareado) | [ ] | [ ] |
 | Shazam | [—] usuário não quer | [—] usuário não quer |

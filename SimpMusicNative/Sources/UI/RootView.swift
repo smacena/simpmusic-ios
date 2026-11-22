@@ -30,6 +30,12 @@ struct RootView: View {
         .tint(Theme.seed)
         .routerSheets(enabled: !showPlayer)
         .fullScreenCover(isPresented: $showPlayer) { PlayerView().routerSheets() }
+        #if DEBUG
+        // Test hook for headless simulator runs: `simctl launch … -debugScreen applog`.
+        .sheet(isPresented: .constant(UserDefaults.standard.string(forKey: "debugScreen")?.hasPrefix("applog") == true)) {
+            NavigationStack { AppLogView() }
+        }
+        #endif
         .alert("Erro", isPresented: Binding(get: { player.errorMessage != nil }, set: { if !$0 { player.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(player.errorMessage ?? "") }

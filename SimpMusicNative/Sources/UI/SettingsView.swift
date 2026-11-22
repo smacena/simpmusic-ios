@@ -230,6 +230,14 @@ struct SettingsView: View {
             Section("Sobre") {
                 NavigationLink("Sobre o app") { AboutView() }
             }
+            Section("Opções de desenvolvedor") {
+                NavigationLink { AppLogView() } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Log do app")
+                        Text("Ver, filtrar e exportar o log do app").font(Theme.bodySmall).foregroundStyle(Theme.body)
+                    }
+                }
+            }
         }
         .scrollContentBackground(.hidden)
         .background(Theme.background)
