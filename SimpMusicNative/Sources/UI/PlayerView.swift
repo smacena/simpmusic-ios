@@ -23,7 +23,12 @@ struct PlayerView: View {
 
     var body: some View {
         Group {
-            if style == "expressive" { expressiveLayout } else { standardLayout }
+            switch style {
+            case "expressive": expressiveLayout
+            case "apple": AppleMusicPlayer(onDismiss: { dismiss() }, menu: AnyView(moreMenuItems), onInfo: { showInfo = true })
+                .onAppear { artwork.update(player.current?.artworkLarge) }
+            default: standardLayout
+            }
         }
         .foregroundStyle(.white)
         .gesture(DragGesture(minimumDistance: 30).onEnded { if $0.translation.height > 80 { dismiss() } })

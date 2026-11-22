@@ -7,8 +7,18 @@ struct LyricsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var lyrics = LyricsStore.shared
     @ObservedObject private var artwork = ArtworkColor.shared
+    /// Inside another screen (the Apple Music player's Lyrics tab): no background, no header.
+    var embedded = false
 
     var body: some View {
+        if embedded {
+            content.foregroundStyle(.white).onAppear { lyrics.load(for: player.current, duration: player.duration) }
+        } else {
+            fullScreen
+        }
+    }
+
+    private var fullScreen: some View {
         ZStack {
             LinearGradient(colors: [artwork.color, Theme.background], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
             VStack(spacing: 0) {
