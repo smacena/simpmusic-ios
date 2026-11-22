@@ -56,6 +56,7 @@ struct SettingsView: View {
                     Text("Classic").tag("classic")
                     Text("M3 Expressive").tag("expressive")
                     Text("Apple Music").tag("apple")
+                    Text("SoundCloud").tag("soundcloud")
                 }
                 Picker("Cor de destaque", selection: $accent) {
                     ForEach(Theme.accents, id: \.key) { Text($0.name).tag($0.key) }

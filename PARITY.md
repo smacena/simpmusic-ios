@@ -32,7 +32,7 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Estilo Classic | [x] | [x] |
 | Estilo M3 Expressive | [x] | [x] |
 | Estilo Apple Music | [x] | [x] |
-| Estilo SoundCloud | [x] | [ ] |
+| Estilo SoundCloud | [x] | [x] |
 | Tela cheia / videoclipe com legendas | [x] | [ ] parcial |
 | Canvas Spotify / capa animada Apple Music | [x] | [ ] |
 | Comentários do vídeo | [x] | [ ] |

@@ -27,6 +27,9 @@ struct PlayerView: View {
             case "expressive": expressiveLayout
             case "apple": AppleMusicPlayer(onDismiss: { dismiss() }, menu: AnyView(moreMenuItems), onInfo: { showInfo = true })
                 .onAppear { artwork.update(player.current?.artworkLarge) }
+            case "soundcloud": SoundCloudPlayer(onDismiss: { dismiss() }, menu: AnyView(moreMenuItems), onInfo: { showInfo = true },
+                                                onLyrics: { showLyrics = true }, onQueue: { showQueue = true }, onAdd: { addTo = player.current })
+                .onAppear { artwork.update(player.current?.artworkLarge) }
             default: standardLayout
             }
         }
