@@ -37,8 +37,13 @@ struct LyricsView: View {
                     VStack(alignment: .leading, spacing: 22) {
                         Color.clear.frame(height: 120)
                         ForEach(lines) { line in
-                            Text(line.text.isEmpty ? "♪" : line.text)
-                                .font(Theme.poppins(line.id == current ? 28 : 24, .bold))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(line.text.isEmpty ? "♪" : line.text)
+                                    .font(Theme.poppins(line.id == current ? 28 : 24, .bold))
+                                if let reading = Romanizer.reading(for: line.text) {
+                                    Text(reading).font(Theme.poppins(line.id == current ? 18 : 16, .medium)).opacity(0.75)
+                                }
+                            }
                                 .foregroundStyle(.white.opacity(line.id == current ? 1 : (lyrics.isSynced ? 0.35 : 0.85)))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(line.id)

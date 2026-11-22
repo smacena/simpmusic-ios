@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var backupURL: URL?
     @State private var importing = false
     @State private var message: String?
+    @State private var romanize = Romanizer.enabled
 
     var body: some View {
         Form {
@@ -42,6 +43,10 @@ struct SettingsView: View {
                     Stepper("Duração: \(Int(crossfadeSeconds)) s", value: $crossfadeSeconds, in: 1 ... 12)
                         .onChange(of: crossfadeSeconds) { _, value in player.crossfadeSeconds = value }
                 }
+            }
+            Section("Letras") {
+                Toggle("Romanizar japonês, chinês e coreano", isOn: $romanize)
+                    .onChange(of: romanize) { _, value in Romanizer.enabled = value }
             }
             Section("Equalizador") {
                 Toggle("Ativado", isOn: $effects.eqEnabled)
