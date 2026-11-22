@@ -144,6 +144,13 @@ struct SettingsView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Theme.background)
+        // SimpMusic's settings look: near-black page, translucent rounded groups, Poppins
+        // throughout, group titles in sentence case.
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
+        .font(Theme.poppins(15))
+        .textCase(nil)
+        .tint(Theme.seed)
         .navigationTitle("Ajustes")
         .sheet(isPresented: $showLogin) { LoginView() }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
