@@ -62,12 +62,20 @@ struct LibraryView: View {
         }
     }
 
+    /// The library's "Most played" dynamic playlist: this device's plays, by count, last 90 days.
+    private var mostPlayed: [Track] {
+        let since = Date().addingTimeInterval(-90 * 86400)
+        let groups = Dictionary(grouping: library.plays.filter { $0.date >= since }, by: \.track.id)
+        return groups.values.sorted { $0.count > $1.count }.prefix(100).map(\.[0].track)
+    }
+
     var body: some View {
         List {
             Picker("", selection: $section) {
                 Text("Favoritas").tag(0)
                 Text("Baixadas").tag(1)
                 Text("Recentes").tag(2)
+                Text("Mais tocadas").tag(4)
                 if account.isSignedIn { Text("YouTube").tag(3) }
             }
             .pickerStyle(.segmented)
@@ -77,8 +85,14 @@ struct LibraryView: View {
                 Label("Estatísticas de escuta", systemImage: "chart.bar.fill").font(Theme.poppins(16, .medium)).foregroundStyle(.white)
             }
             .listRowBackground(Theme.surface)
+            if account.isSignedIn {
+                NavigationLink { MixForYouView() } label: {
+                    Label("Mix para você", systemImage: "sparkles").font(Theme.poppins(16, .medium)).foregroundStyle(.white)
+                }
+                .listRowBackground(Theme.surface)
+            }
             playlistsSection
-            let tracks = section == 0 ? library.favorites : section == 1 ? library.downloaded : section == 2 ? library.recent : (accountLikes ?? [])
+            let tracks = section == 0 ? library.favorites : section == 1 ? library.downloaded : section == 2 ? library.recent : section == 4 ? mostPlayed : (accountLikes ?? [])
             if section == 3, accountLikes == nil { ProgressView().frame(maxWidth: .infinity) }
             if tracks.isEmpty {
                 Text(section == 0 ? "Toque no coração no player para guardar músicas aqui." :
@@ -88,7 +102,7 @@ struct LibraryView: View {
                     .listRowBackground(Theme.background)
             }
             ForEach(Array(tracks.enumerated()), id: \.element.id) { offset, track in
-                Button { player.play(tracks, startAt: offset, title: ["Favoritas", "Baixadas", "Recentes", "Curtidas no YouTube"][min(section, 3)]) } label: { TrackRow(track: track, highlighted: player.current?.id == track.id) }
+                Button { player.play(tracks, startAt: offset, title: ["Favoritas", "Baixadas", "Recentes", "Curtidas no YouTube", "Mais tocadas"][min(section, 4)]) } label: { TrackRow(track: track, highlighted: player.current?.id == track.id) }
                     .buttonStyle(.plain)
                     .listRowBackground(Theme.background)
                     .swipeActions {
@@ -106,5 +120,35 @@ struct LibraryView: View {
             // The account's liked songs on YouTube Music.
             if section == 3, accountLikes == nil { accountLikes = (try? await InnerTube.shared.collectionTracks("FEmusic_liked_videos")) ?? [] }
         }
+    }
+}
+
+
+/// YouTube Music's "Mix for you" playlists (FEmusic_mixed_for_you), like the original's tab.
+struct MixForYouView: View {
+    @State private var shelves: [InnerTube.Shelf] = []
+    @State private var loading = true
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                if loading { ProgressView().tint(.white).frame(maxWidth: .infinity).padding(.top, 80) }
+                if !loading && shelves.isEmpty {
+                    Text("O YouTube não mandou mixes para esta conta.").font(Theme.bodyMedium).foregroundStyle(Theme.body).padding()
+                }
+                ForEach(shelves) { ShelfView(shelf: $0) }
+                Color.clear.frame(height: 160)
+            }
+            .padding(.top, 8)
+        }
+        .background(Theme.background)
+        .navigationTitle("Mix para você")
+        .refreshable { await load() }
+        .task { if shelves.isEmpty { await load() } }
+    }
+
+    private func load() async {
+        shelves = (try? await InnerTube.shared.shelves(browseId: "FEmusic_mixed_for_you")) ?? []
+        loading = false
     }
 }

@@ -11,8 +11,8 @@ Tirada do código (telas em `composeApp/.../ui/screen`, opções de `SettingScre
 | Busca (abas, sugestões, histórico) | [x] | [x] |
 | Biblioteca (playlists, curtidas, baixadas, chips) | [x] | [x] |
 | Biblioteca: aba Wrapped + recap mensal | [x] | [ ] |
-| Mix para você (MixForYouScreen) | [x] | [ ] |
-| Playlists dinâmicas da biblioteca | [x] | [ ] |
+| Mix para você (MixForYouScreen) | [x] | [x] |
+| Playlists dinâmicas da biblioteca | [x] | [x] (seguidos depende de "seguir artistas") |
 | Playlist local (editar, IA sugerir) | [x] | [ ] parcial |
 | Álbum / Playlist / Artista (cabeçalho imersivo) | [x] | [ ] parcial |
 | Mais álbuns do artista | [x] | [x] |
