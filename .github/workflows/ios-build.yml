@@ -32,9 +32,30 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -project SimpMusicNative.xcodeproj -scheme SimpMusicNative -configuration Debug \
-            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ~/Library/Developer/Xcode/DerivedData/ci \
             CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build.log | grep -E "error:|warning: unre|BUILD" || true
           grep -q "BUILD SUCCEEDED" build.log
+      - name: Screenshots (home, library, search, every player style)
+        working-directory: SimpMusicNative
+        run: |
+          set -x
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -path "*Debug-iphonesimulator/SimpMusic.app" -type d | head -1)
+          DEVICE=$(xcrun simctl list devices available | grep -E "iPhone 1[5-9]( Pro)? \(" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          xcrun simctl boot "$DEVICE"; xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install "$DEVICE" "$APP"
+          mkdir -p shots
+          shot() { xcrun simctl terminate "$DEVICE" org.simpmusic.personal.native || true
+                   xcrun simctl launch "$DEVICE" org.simpmusic.personal.native -ui-demo "$@"; sleep 9
+                   xcrun simctl io "$DEVICE" screenshot "shots/$NAME.png"; }
+          NAME=home shot
+          NAME=library shot -ui-tab library
+          NAME=search shot -ui-tab search
+          for style in classic expressive apple soundcloud; do NAME=player-$style shot -ui-style $style -ui-player; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: SimpMusicNative/shots/*.png
+          retention-days: 7
       - name: C audio tests (pitch, 8D)
         run: |
           cat > /tmp/t.c <<'C'

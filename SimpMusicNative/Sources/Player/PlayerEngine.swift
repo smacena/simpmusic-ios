@@ -221,6 +221,17 @@ final class PlayerEngine: ObservableObject {
 
     func cycleRepeat() { repeatMode = (repeatMode + 1) % 3 }
 
+    /// Screenshot runs only: a sample song in the queue, not loaded (nothing plays).
+    func loadDemo() {
+        let demo = Track(id: "lYBUbBu4W08", title: "Música de exemplo", artist: "Artista",
+                         thumbnail: URL(string: "https://i.ytimg.com/vi/lYBUbBu4W08/hqdefault.jpg"), durationText: "3:30")
+        queue = [demo]
+        index = 0
+        duration = 210
+        position = 64
+        queueTitle = "Fila"
+    }
+
     // MARK: Queue editing
 
     /// Inserts [track] right after the current song (or starts it when nothing plays).

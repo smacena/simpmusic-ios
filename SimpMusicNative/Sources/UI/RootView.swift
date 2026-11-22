@@ -8,6 +8,14 @@ struct RootView: View {
     @State private var tab: Tab = .home
     @State private var showPlayer = false
 
+    /// Screenshot runs (GitHub Actions): `-ui-tab library|search`, `-ui-player`, `-ui-style <style>`,
+    /// `-ui-demo` (a sample song in the queue so the player has something to show; nothing plays).
+    private static let args = ProcessInfo.processInfo.arguments
+    private static func arg(_ name: String) -> String? {
+        guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
+        return args[i + 1]
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             Theme.background.ignoresSafeArea()
@@ -28,6 +36,16 @@ struct RootView: View {
             .padding(.bottom, 4)
         }
         .tint(Theme.seed)
+        .onAppear {
+            if let style = Self.arg("-ui-style") { UserDefaults.standard.set(style, forKey: "player.style") }
+            if Self.args.contains("-ui-demo") { player.loadDemo() }
+            switch Self.arg("-ui-tab") {
+            case "library": tab = .library
+            case "search": tab = .search
+            default: break
+            }
+            if Self.args.contains("-ui-player") { DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { showPlayer = true } }
+        }
         .routerSheets(enabled: !showPlayer)
         .fullScreenCover(isPresented: $showPlayer) { PlayerView().routerSheets() }
         #if DEBUG
