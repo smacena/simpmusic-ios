@@ -14,9 +14,11 @@ kotlin {
         minSdk = 26
     }
 
-    // Android sends, Desktop receives; iOS takes no part. With JVM-based targets only, commonMain can
-    // use javax.crypto directly — no expect/actual for the cipher.
+    // Android sends, Desktop receives, and iOS does both (shows a QR for an Android phone, or scans
+    // a computer's). The cipher is javax.crypto on Android/JVM and CommonCrypto on iOS.
     jvm()
+    iosArm64()
+    iosSimulatorArm64()
 
     sourceSets {
         commonMain {
@@ -31,13 +33,29 @@ kotlin {
             }
         }
 
+        val jvmAndroidMain by creating { dependsOn(commonMain.get()) }
+        androidMain.get().dependsOn(jvmAndroidMain)
         jvmMain {
+            dependsOn(jvmAndroidMain)
             dependencies {
-                // Only the Desktop hosts a server; the APK never ships these.
+                // Only the Desktop and iOS host a server; the APK never ships these.
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.server.cio)
             }
         }
+        // A custom dependsOn turns the default hierarchy off, so the iOS set is wired by hand.
+        val iosMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.cio)
+            }
+        }
+        getByName("iosArm64Main").dependsOn(iosMain)
+        getByName("iosSimulatorArm64Main").dependsOn(iosMain)
+        val iosTest by creating { dependsOn(commonTest.get()) }
+        getByName("iosSimulatorArm64Test").dependsOn(iosTest)
+        getByName("iosArm64Test").dependsOn(iosTest)
 
         commonTest {
             dependencies {

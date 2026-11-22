@@ -721,8 +721,8 @@ fun SettingScreen(
                         },
                 )
                 // Above every section, and inside item 0 rather than an item of its own, for the
-                // glow reason above. iOS has no pairing transport (loginSync is Android + JVM).
-                if (getPlatform() != Platform.iOS) SettingGroup(
+                // glow reason above. iOS offers login sync (both ways) but not library sync.
+                SettingGroup(
                     title = stringResource(Res.string.login_sync_section),
                     modifier = Modifier.onSizeChanged { devicesGroupHeightPx = it.height },
                 ) {
@@ -734,13 +734,14 @@ fun SettingScreen(
                             ),
                         subtitle =
                             when {
+                                getPlatform() == Platform.iOS -> "Receber de um Android ou enviar para o computador, pelo QR"
                                 getPlatform() != Platform.Android -> stringResource(Res.string.login_sync_desktop_description)
                                 syncPeer != null -> stringResource(Res.string.library_sync_send_logins_paired, syncPeer.name)
                                 else -> stringResource(Res.string.login_sync_android_description)
                             },
                         onClick = { showLoginSyncDialog = true },
                     )
-                    SettingItem(
+                    if (getPlatform() != Platform.iOS) SettingItem(
                         title = stringResource(Res.string.library_sync_title),
                         subtitle =
                             when {

@@ -15,6 +15,9 @@ final class Account: ObservableObject {
 
     private init() { isSignedIn = Self.cachedCookie != nil }
 
+    /// The cookie header, for Login Sync to hand to another device.
+    nonisolated static var currentCookie: String? { cachedCookie }
+
     func signIn(cookieHeader: String) {
         Self.writeKeychain(cookieHeader)
         Self.cachedCookie = cookieHeader

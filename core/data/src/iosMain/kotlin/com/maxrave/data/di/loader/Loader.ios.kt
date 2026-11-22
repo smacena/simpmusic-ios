@@ -9,6 +9,16 @@ import com.maxrave.domain.mediaservice.handler.DownloadHandler
 import com.maxrave.domain.mediaservice.player.MediaPlayerInterface
 import com.maxrave.domain.repository.CacheRepository
 import com.maxrave.domain.repository.LibrarySyncRepository
+import com.maxrave.domain.repository.LibrarySyncPhoneRepository
+import com.maxrave.domain.repository.LoginSyncHostRepository
+import com.maxrave.domain.repository.LoginSyncSenderRepository
+import com.maxrave.data.loginsync.LoginSyncHostRepositoryImpl
+import com.maxrave.data.loginsync.LoginSyncSenderRepositoryImpl
+import com.maxrave.data.loginsync.LoginSyncStore
+import org.simpmusic.loginsync.LoginSyncClient
+import com.maxrave.domain.data.model.loginsync.DesktopInfo
+import com.maxrave.domain.data.model.loginsync.LoginSyncService
+import com.maxrave.domain.data.model.librarysync.SyncPeer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,13 +59,19 @@ actual fun loadMediaService() {
     )
 }
 
-/** Login sync is one-sided per platform: Desktop hosts, Android sends, iOS takes no part. */
+/**
+ * Login sync on iOS goes both ways: the iPhone hosts a QR for the Android app to send sign-ins to
+ * (like Desktop), or scans a computer's QR and sends its own (like Android). Library sync (the paired
+ * channel) stays Android/Desktop-only, so its repository is a stub that never pairs.
+ */
 actual fun loadLoginSyncModule() {
     loadKoinModules(
         module {
-            // Settings asks this whether a pairing exists; on iOS there never is one.
-            single<LibrarySyncRepository> {
-                object : LibrarySyncRepository {
+            single { LoginSyncStore(get(), get(), get()) }
+            single<LoginSyncSenderRepository> { LoginSyncSenderRepositoryImpl(get(), LoginSyncClient()) }
+            single<LoginSyncHostRepository> { LoginSyncHostRepositoryImpl(get()) }
+            single<LibrarySyncPhoneRepository> {
+                object : LibrarySyncPhoneRepository {
                     override val state: StateFlow<LibrarySyncState> = MutableStateFlow(LibrarySyncState())
                     override val pendingSettings: StateFlow<PendingSettings?> = MutableStateFlow(null)
 
@@ -66,8 +82,19 @@ actual fun loadLoginSyncModule() {
                     override suspend fun applyPendingSettings() {}
 
                     override suspend fun dismissPendingSettings() {}
+
+                    override fun isPairingCode(qrText: String): Boolean = false
+
+                    override suspend fun reach(qrText: String): DesktopInfo = throw UnsupportedOperationException("library sync is not available on iOS")
+
+                    override suspend fun pair(): SyncPeer = throw UnsupportedOperationException("library sync is not available on iOS")
+
+                    override fun cancelPairing() {}
+
+                    override suspend fun sendLogins(services: Set<LoginSyncService>): List<LoginSyncService> = emptyList()
                 }
             }
+            single<LibrarySyncRepository> { get<LibrarySyncPhoneRepository>() }
         },
     )
 }

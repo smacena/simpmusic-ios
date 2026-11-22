@@ -135,6 +135,8 @@ kotlin {
                 // part of KMP’s default source set hierarchy. Note that this source set depends
                 // on common by default and will correctly pull the iOS artifacts of any
                 // KMP dependencies declared in commonMain.
+                // Login sync: iOS both receives (from Android) and sends (to Desktop)
+                implementation(projects.loginSync)
             }
         }
 

@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var crossfadeSeconds = PlayerEngine.shared.crossfadeSeconds
     @ObservedObject private var account = Account.shared
     @State private var showLogin = false
+    @State private var showSync = false
     @State private var backupURL: URL?
     @State private var importing = false
     @State private var message: String?
@@ -30,7 +31,9 @@ struct SettingsView: View {
                 if account.isSignedIn {
                     Label("Conectado", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     Button("Sair da conta", role: .destructive) { account.signOut() }
-                } else {
+                }
+                Button("Sincronizar login (Android / computador)") { showSync = true }
+                if !account.isSignedIn {
                     Button("Entrar com Google") { showLogin = true }
                     Text("Opcional. Personaliza o início e mostra suas músicas curtidas. A senha é digitada só na página do Google.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -153,6 +156,7 @@ struct SettingsView: View {
         .tint(Theme.seed)
         .navigationTitle("Ajustes")
         .sheet(isPresented: $showLogin) { LoginView() }
+        .sheet(isPresented: $showSync) { LoginSyncView().preferredColorScheme(.dark) }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
             guard case let .success(url) = result else { return }
             do {
