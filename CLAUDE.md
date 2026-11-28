@@ -1,5 +1,88 @@
 # CLAUDE.md - SimpMusic Project Guide for AI Agents
 
+# Regras permanentes de trabalho 
+
+## Pedido curto (para colar)
+
+Trabalhe de forma autônoma e completa até o fim do projeto indicado.
+
+- Objetivo: 100% do projeto de referência, funcionalidade por funcionalidade. Aparência segue a plataforma solicitada.
+- Não pare para reportar que um bloco terminou. Quando acabar um bloco, comece o seguinte.
+- Não precisa gerar relatório de tudo que está fazendo, só as mais pertinentes.
+- Não faça perguntas de rotina. Use o padrão já definido no repositório. Pergunte só se houver bloqueio real que eu precise resolver (diga exatamente qual), por exemplo credencial que não existe, acesso negado ou decisão que mude o escopo.
+- Dúvidas que dependam de decisão minha devem ser tratadas no início, na lista de pendências, e não no meio do trabalho.
+- Ao terminar tudo, entregue um resumo único: o que ficou igual, o que é diferente, o que é impossível (com motivo) e onde está o resultado.
+- Se houver objeções às regras deste documento, apresente-as no início para serem tratadas.
+
+## Regras técnicas
+
+- Lista de trabalho: a do projeto (a lista que for criada a partir da referência).
+- Cada item só vira `[x]` depois de implementado e testado.
+- Textos de interface precisam ser discutidos no início (por exemplo, idiomas). Idiomas já aprovados pelo dono; o inglês também precisa ser testado como os demais.
+- Não apagar branches, não reescrever histórico e não publicar nada fora do repositório sem autorização explícita.
+- Só escreva ao dono no fim de um bloco. As verificações rodam no CI, para não consumir nada meu.
+
+## Entrada que só o dono pode dar (uma vez)
+
+- Sem restrições aqui por enquanto.
+  
+## Ordens permanentes (não me faça repetir)
+
+1. **Montar sozinho todo ambiente de teste.** Servidores, máquina limpa, tela virtual,
+   leitor de tela, impressora virtual. "Não tenho o ambiente" nunca é motivo para não testar.
+   O que for impossível aqui, você diz no relatório em vez de pular calado.
+2. **Testar o que eu vou usar, não o seu build.** O produto é o .app dentro do .dmg,
+   instalado em /Applications num macOS sem ferramentas de desenvolvedor. Um programa que
+   só roda na sua pasta de build não está testado. Adapte isso se estiver no iPhone.
+3. **Testar fora do padrão.** Todos os idiomas, todos os temas, modo claro e escuro,
+   primeira execução sem configuração nenhuma. É aí que moram os piores defeitos; em inglês
+   com o tema padrão tudo parece funcionar.
+4. **Testar como pessoa, não como script.** Foco do teclado ao abrir, queda do programa
+   (kill -9) com texto não salvo, arquivo binário, arquivo gigante, nome com acento,
+   arquivo somente leitura, atualizar de uma versão para outra, desinstalar sem deixar lixo. Adaptar as particularidades do iPhone
+5. **Todo defeito corrigido vira teste permanente** (autoteste ou CI), para não voltar.
+   E ao achar um defeito, procure o mesmo padrão no resto do código antes de seguir.
+6. **Só marque um item como pronto depois de comparar com o código do SimpMusic e testar.**
+   Nada de marcar porque a função existe.
+7. **Não diga "terminei" enquanto houver item sem teste.** No relatório, liste separado:
+   feito, testado, não testado e por quê.
+8. **Não pergunte o óbvio.** Decida, faça e registre. Pergunte só se uma decisão já fechada
+   precisar mudar ou se houver bloqueio real.
+9. **Poucos relatórios, curtos, só no fim de cada bloco.** Não me conte que compilou nem que
+   o autoteste passou.
+10. **Estrutura de menus igual em todos os idiomas.** No Linux, fora do inglês, o menu File
+    ficava com 7 itens em vez de 32 e a ordem dos menus ficava errada (valia também para o
+    português). Todo idioma tem que ter a mesma quantidade de itens e a mesma ordem do inglês,
+    com os nomes certos nos menus principais. Isso vira teste automático no CI, para todos os
+    idiomas, e não pode ser conferido só a olho.
+
+## Específico do macOS
+
+- Você roda num container Linux: **não dá para compilar nem abrir o programa aqui**. Diga isso
+  na primeira mensagem e use **GitHub Actions com runner macOS** (macos-14/macos-15) para
+  compilar, testar, tirar capturas de tela e empacotar. Não finja ter testado.Eu não sei Github Action do iPhone, adapte a necessidade.
+- **Compilação e testes no GitHub Actions**, para poupar o MacBook do dono. Ele não compila nem
+  testa no dia a dia. O que só dá para testar num Mac real (VoiceOver, modo escuro com troca
+  real, Intel se o MacBook for Intel) vai para o arquivo `docs/MAC_BATCH.md`, como item de lote.
+  O dono roda o lote inteiro de uma vez no MacBook, de vez em quando, com um único comando que
+  gera um relatório. Não há testes soltos no MacBook durante o trabalho.
+  No CI, esses testes valem como **aproximação** (por exemplo, modo escuro simulado ou checagem
+  de rótulos do VoiceOver). No relatório, cada um é marcado como "aproximação no CI" ou
+  "testado no MacBook", conforme o lote tenha rodado ou não.
+- **O .app precisa trazer as dependências dentro dele** (macdeployqt ou equivalente), incluindo
+  o plugin de plataforma cocoa. No Linux esse foi o pior defeito: o pacote instalava e o
+  programa não abria janela nenhuma num sistema limpo.
+- **Assinatura, sem notarização** (decisão do dono). Assinatura ad-hoc no .app e instrução de
+  `xattr` no README para o Gatekeeper. Teste o caminho real: baixar, montar, arrastar e abrir.
+- **Permissões do sistema** (acesso a Documentos, Downloads, Área de Trabalho) só aparecem num
+  Mac limpo, não no seu build.
+- **Atalhos e menus do Mac**: Cmd em vez de Ctrl, barra de menus global, menu do aplicativo
+  (Quill > Ajustes, Sobre, Serviços, Ocultar, Sair), nomes das janelas padrão do sistema.
+- **Acessibilidade**: o leitor de tela é o VoiceOver, não o Orca.
+- **Modo escuro do sistema**: o programa tem que acompanhar a troca sem reiniciar.
+- **Release**: só com CI verde e com o .dmg aberto num macOS limpo.
+Coloquei muita coisa que pertence ao uso do meu mac, adapte isso ao uso do iPhone, não conheço iPhone. Se houve objeções, diga.
+
 ## 🌐 Language Rule
 
 **Response language**: Always respond in **English**.
